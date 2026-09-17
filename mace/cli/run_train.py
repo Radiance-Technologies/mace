@@ -261,7 +261,7 @@ def run(args) -> None:
             head_config.atomic_numbers = None
 
             if args.pt_statistics_file is not None:
-                with open(head_config.pt_statistics_file, "r") as f:  # pylint: disable=W1514
+                with open(head_config.statistics_file, "r") as f:  # pylint: disable=W1514
                     statistics = json.load(f)
                 logging.info("Using statistics json file")
                 head_config.atomic_numbers = statistics["atomic_numbers"]

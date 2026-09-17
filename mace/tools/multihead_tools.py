@@ -128,12 +128,24 @@ def prepare_pt_head(
             "avg_num_neighbors": foundation_model_num_neighbours,
             "compute_avg_num_neighbors": False,
         }
-    else:
+    elif args.pt_statistics_file is not None:
         pt_head = {
             "train_file": args.pt_train_file,
             "valid_file": args.pt_valid_file,
             "E0s": "foundation",
             "statistics_file": args.pt_statistics_file,
+            "valid_fraction": args.valid_fraction,
+            "key_specification": pt_keyspec,
+            "avg_num_neighbors": foundation_model_num_neighbours,
+            "keep_isolated_atoms": args.keep_isolated_atoms,
+            "compute_avg_num_neighbors": False,
+        }
+    else:
+        pt_head = {
+            "train_file": args.pt_train_file,
+            "valid_file": args.pt_valid_file,
+            "E0s": "foundation",
+            "statistics_file": args.statistics_file,
             "valid_fraction": args.valid_fraction,
             "key_specification": pt_keyspec,
             "avg_num_neighbors": foundation_model_num_neighbours,
