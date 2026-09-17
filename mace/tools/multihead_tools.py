@@ -46,9 +46,8 @@ class HeadConfig:
     atomic_energies_dict: Optional[Dict[str, float]] = None
 
 
-def dict_head_to_dataclass(
-    head: Dict[str, Any], head_name: str, args: argparse.Namespace
-) -> HeadConfig:
+def dict_head_to_dataclass(head: Dict[str, Any], head_name: str,
+                           args: argparse.Namespace) -> HeadConfig:
     """Convert head dictionary to HeadConfig dataclass."""
     # parser+head args that have no defaults but are required
     if (args.train_file is None) and (head.get("train_file", None) is None):
@@ -65,16 +64,18 @@ def dict_head_to_dataclass(
         E0s=head.get("E0s", args.E0s),
         statistics_file=head.get("statistics_file", args.statistics_file),
         valid_fraction=head.get("valid_fraction", args.valid_fraction),
-        config_type_weights=head.get("config_type_weights", args.config_type_weights),
-        compute_avg_num_neighbors=head.get(
-            "compute_avg_num_neighbors", args.compute_avg_num_neighbors
-        ),
+        config_type_weights=head.get("config_type_weights",
+                                     args.config_type_weights),
+        compute_avg_num_neighbors=head.get("compute_avg_num_neighbors",
+                                           args.compute_avg_num_neighbors),
         atomic_numbers=head.get("atomic_numbers", args.atomic_numbers),
         mean=head.get("mean", args.mean),
         std=head.get("std", args.std),
-        avg_num_neighbors=head.get("avg_num_neighbors", args.avg_num_neighbors),
+        avg_num_neighbors=head.get("avg_num_neighbors",
+                                   args.avg_num_neighbors),
         key_specification=head["key_specification"],
-        keep_isolated_atoms=head.get("keep_isolated_atoms", args.keep_isolated_atoms),
+        keep_isolated_atoms=head.get("keep_isolated_atoms",
+                                     args.keep_isolated_atoms),
     )
 
 
@@ -102,17 +103,21 @@ def prepare_pt_head(
     foundation_model_num_neighbours: float,
 ) -> Dict[str, Any]:
     """Prepare a pretraining head from args."""
-    if args.foundation_model in ["small", "medium", "large"] or args.pt_train_file in [
-        "mp",
-        "omat",
-        "matpes_pbe",
-        "matpes_r2scan",
-    ]:
+    if args.foundation_model in ["small", "medium", "large"
+                                 ] or args.pt_train_file in [
+                                     "mp",
+                                     "omat",
+                                     "matpes_pbe",
+                                     "matpes_r2scan",
+                                 ]:
         logging.info(
             "Using foundation model for multiheads finetuning with Materials Project data"
         )
         pt_keyspec.update(
-            info_keys={"energy": "energy", "stress": "stress"},
+            info_keys={
+                "energy": "energy",
+                "stress": "stress"
+            },
             arrays_keys={"forces": "forces"},
         )
         pt_head = {
@@ -128,7 +133,7 @@ def prepare_pt_head(
             "train_file": args.pt_train_file,
             "valid_file": args.pt_valid_file,
             "E0s": "foundation",
-            "statistics_file": args.statistics_file,
+            "statistics_file": args.pt_statistics_file,
             "valid_fraction": args.valid_fraction,
             "key_specification": pt_keyspec,
             "avg_num_neighbors": foundation_model_num_neighbours,
@@ -159,28 +164,24 @@ def assemble_replay_data(
             raise ValueError(f"Unknown replay dataset name {name}")
 
         cache_dir = get_cache_dir()
-        checkpoint_url_name = "".join(
-            c for c in os.path.basename(checkpoint_url) if c.isalnum() or c in "_"
-        )
+        checkpoint_url_name = "".join(c
+                                      for c in os.path.basename(checkpoint_url)
+                                      if c.isalnum() or c in "_")
         cached_dataset_path = f"{cache_dir}/{checkpoint_url_name}"
         if not os.path.isfile(cached_dataset_path):
             os.makedirs(cache_dir, exist_ok=True)
             # download and save to disk
             logging.info("Downloading MP structures for finetuning")
-            _, http_msg = urllib.request.urlretrieve(
-                checkpoint_url, cached_dataset_path
-            )
+            _, http_msg = urllib.request.urlretrieve(checkpoint_url,
+                                                     cached_dataset_path)
             if "Content-Type: text/html" in http_msg:
                 raise RuntimeError(
                     f"Dataset download failed, please check the URL {checkpoint_url}"
                 )
             logging.info(f"Materials Project dataset to {cached_dataset_path}")
         output = f"mp_finetuning-{tag}.xyz"
-        atomic_numbers = (
-            ast.literal_eval(args.atomic_numbers)
-            if args.atomic_numbers is not None
-            else None
-        )
+        atomic_numbers = (ast.literal_eval(args.atomic_numbers)
+                          if args.atomic_numbers is not None else None)
         settings = SelectionSettings(
             configs_pt=cached_dataset_path,
             output=f"mp_finetuning-{tag}.xyz",
@@ -207,11 +208,8 @@ def assemble_replay_data(
             key_specification=head_config_pt.key_specification,
             head_name="pt_head",
             keep_isolated_atoms=args.keep_isolated_atoms,
-            no_data_ok=(
-                args.pseudolabel_replay
-                and args.multiheads_finetuning
-                and head_config_pt.head_name == "pt_head"
-            ),
+            no_data_ok=(args.pseudolabel_replay and args.multiheads_finetuning
+                        and head_config_pt.head_name == "pt_head"),
             prefix=args.name,
         )
         return collections_mp
@@ -256,7 +254,7 @@ def generate_pseudolabels_for_configs(
 
     # Process configs in batches
     for i in range(0, len(configs), batch_size):
-        batch_configs = configs[i : i + batch_size]
+        batch_configs = configs[i:i + batch_size]
 
         try:
             # Create temporary AtomicData objects for this batch
@@ -290,49 +288,43 @@ def generate_pseudolabels_for_configs(
                 if not hasattr(config_copy, "property_weights"):
                     config_copy.property_weights = {}
 
-                original_stress_weight = config.property_weights.get("stress", 0.0)
-                had_stress = (
-                    config.properties.get("stress") is not None
-                    and original_stress_weight > 0.0
-                )
+                original_stress_weight = config.property_weights.get(
+                    "stress", 0.0)
+                had_stress = (config.properties.get("stress") is not None
+                              and original_stress_weight > 0.0)
 
                 # Update config properties with pseudolabels
                 if "energy" in out and out["energy"] is not None:
                     config_copy.properties["energy"] = (
-                        out["energy"][j].detach().cpu().item()
-                    )
+                        out["energy"][j].detach().cpu().item())
                 if "forces" in out and out["forces"] is not None:
                     # Forces are per atom
                     node_start = batch.ptr[j].item()
                     node_end = batch.ptr[j + 1].item()
 
                     config_copy.properties["forces"] = (
-                        out["forces"][node_start:node_end].detach().cpu().numpy()
-                    )
+                        out["forces"]
+                        [node_start:node_end].detach().cpu().numpy())
                 if "stress" in out and out["stress"] is not None:
                     if had_stress or force_stress:
                         config_copy.properties["stress"] = (
-                            out["stress"][j].detach().cpu().numpy()
-                        )
+                            out["stress"][j].detach().cpu().numpy())
                         config_copy.property_weights["stress"] = (
-                            original_stress_weight if had_stress else 1.0
-                        )
+                            original_stress_weight if had_stress else 1.0)
                 if "virials" in out and out["virials"] is not None:
                     config_copy.properties["virials"] = (
-                        out["virials"][j].detach().cpu().numpy()
-                    )
+                        out["virials"][j].detach().cpu().numpy())
                 if "dipole" in out and out["dipole"] is not None:
                     config_copy.properties["dipole"] = (
-                        out["dipole"][j].detach().cpu().numpy()
-                    )
+                        out["dipole"][j].detach().cpu().numpy())
                 if "charges" in out and out["charges"] is not None:
                     # Charges are per atom
                     node_start = batch.ptr[j].item()
                     node_end = batch.ptr[j + 1].item()
 
                     config_copy.properties["charges"] = (
-                        out["charges"][node_start:node_end].detach().cpu().numpy()
-                    )
+                        out["charges"]
+                        [node_start:node_end].detach().cpu().numpy())
 
                 updated_configs.append(config_copy)
 
@@ -341,13 +333,15 @@ def generate_pseudolabels_for_configs(
                 f"Error generating pseudolabels for batch {i//batch_size + 1}: {str(e)}"
             )
             # On error, return the original configs for this batch
-            updated_configs.extend([deepcopy(config) for config in batch_configs])
+            updated_configs.extend(
+                [deepcopy(config) for config in batch_configs])
 
     # Restore original requires_grad settings
     for param, requires_grad in original_requires_grad.items():
         param.requires_grad = requires_grad
 
-    logging.info(f"Generated pseudolabels for {len(updated_configs)} configurations")
+    logging.info(
+        f"Generated pseudolabels for {len(updated_configs)} configurations")
     return updated_configs
 
 
@@ -383,23 +377,23 @@ def apply_pseudolabels_to_pt_head_configs(
         # Use foundation model's z_table if available
         if hasattr(foundation_model, "atomic_numbers"):
             z_table = AtomicNumberTable(
-                sorted(foundation_model.atomic_numbers.tolist())
-            )
+                sorted(foundation_model.atomic_numbers.tolist()))
             logging.info(
                 f"Using foundation model's atomic numbers for pseudolabeling: {z_table.zs}"
             )
-        elif hasattr(pt_head_config, "z_table") and pt_head_config.z_table is not None:
+        elif hasattr(pt_head_config,
+                     "z_table") and pt_head_config.z_table is not None:
             z_table = pt_head_config.z_table
-            logging.info(f"Using pt_head's z_table for pseudolabeling: {z_table.zs}")
+            logging.info(
+                f"Using pt_head's z_table for pseudolabeling: {z_table.zs}")
         else:
-            logging.warning("No atomic number table available for pseudolabeling")
+            logging.warning(
+                "No atomic number table available for pseudolabeling")
             return False
 
         # Process training configurations
-        if (
-            hasattr(pt_head_config.collections, "train")
-            and pt_head_config.collections.train
-        ):
+        if (hasattr(pt_head_config.collections, "train")
+                and pt_head_config.collections.train):
             logging.info(
                 f"Generating pseudolabels for {len(pt_head_config.collections.train)} pt_head training configurations"
             )
@@ -420,10 +414,8 @@ def apply_pseudolabels_to_pt_head_configs(
             )
 
         # Process validation configurations if they exist
-        if (
-            hasattr(pt_head_config.collections, "valid")
-            and pt_head_config.collections.valid
-        ):
+        if (hasattr(pt_head_config.collections, "valid")
+                and pt_head_config.collections.valid):
             logging.info(
                 f"Generating pseudolabels for {len(pt_head_config.collections.valid)} pt_head validation configurations"
             )

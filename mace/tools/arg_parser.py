@@ -27,8 +27,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         )
     except ImportError:
         parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        )
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter, )
 
     # Name and seed
     parser.add_argument("--name", help="experiment name", required=True)
@@ -41,24 +40,28 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         type=str,
         default=".",
     )
-    parser.add_argument(
-        "--log_dir", help="directory for log files", type=str, default=None
-    )
-    parser.add_argument(
-        "--model_dir", help="directory for final model", type=str, default=None
-    )
+    parser.add_argument("--log_dir",
+                        help="directory for log files",
+                        type=str,
+                        default=None)
+    parser.add_argument("--model_dir",
+                        help="directory for final model",
+                        type=str,
+                        default=None)
     parser.add_argument(
         "--checkpoints_dir",
         help="directory for checkpoint files",
         type=str,
         default=None,
     )
-    parser.add_argument(
-        "--results_dir", help="directory for results", type=str, default=None
-    )
-    parser.add_argument(
-        "--downloads_dir", help="directory for downloads", type=str, default=None
-    )
+    parser.add_argument("--results_dir",
+                        help="directory for results",
+                        type=str,
+                        default=None)
+    parser.add_argument("--downloads_dir",
+                        help="directory for downloads",
+                        type=str,
+                        default=None)
 
     # Device and logging
     parser.add_argument(
@@ -87,7 +90,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         choices=["slurm", "torchrun", "mpi", "none"],
         help="How the job was launched",
     )
-    parser.add_argument("--log_level", help="log level", type=str, default="INFO")
+    parser.add_argument("--log_level",
+                        help="log level",
+                        type=str,
+                        default="INFO")
 
     parser.add_argument(
         "--plot",
@@ -98,7 +104,8 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--plot_frequency",
-        help="Set plotting frequency: '0' for only at the end or an integer N to plot every N epochs.",
+        help=
+        "Set plotting frequency: '0' for only at the end or an integer N to plot every N epochs.",
         type=int,
         default="0",
     )
@@ -146,9 +153,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
             "EnergyDipolesMACE",
         ],
     )
-    parser.add_argument(
-        "--r_max", help="distance cutoff (in Ang)", type=float, default=5.0
-    )
+    parser.add_argument("--r_max",
+                        help="distance cutoff (in Ang)",
+                        type=float,
+                        default=5.0)
     parser.add_argument(
         "--radial_type",
         help="type of radial basis functions",
@@ -225,12 +233,14 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
             "RealAgnosticResidualNonLinearInteractionBlock",
         ],
     )
-    parser.add_argument(
-        "--max_ell", help=r"highest \ell of spherical harmonics", type=int, default=3
-    )
-    parser.add_argument(
-        "--correlation", help="correlation order at each layer", type=int, default=3
-    )
+    parser.add_argument("--max_ell",
+                        help=r"highest \ell of spherical harmonics",
+                        type=int,
+                        default=3)
+    parser.add_argument("--correlation",
+                        help="correlation order at each layer",
+                        type=int,
+                        default=3)
     parser.add_argument(
         "--use_reduced_cg",
         help="use reduced generalized Clebsch-Gordan coefficients",
@@ -249,9 +259,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         type=str2bool,
         default=False,
     )
-    parser.add_argument(
-        "--num_interactions", help="number of interactions", type=int, default=2
-    )
+    parser.add_argument("--num_interactions",
+                        help="number of interactions",
+                        type=int,
+                        default=2)
     parser.add_argument(
         "--MLP_irreps",
         help="hidden irreps of the MLP in last readout",
@@ -346,7 +357,8 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--field_si",
-        help="include self-interaction when projecting local fields in PolarMACE",
+        help=
+        "include self-interaction when projecting local fields in PolarMACE",
         type=str2bool,
         default=False,
     )
@@ -534,13 +546,15 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     # Fine-tuning
     parser.add_argument(
         "--pseudolabel_replay",
-        help="Use pseudolabels from foundation model for replay data in multihead finetuning",
+        help=
+        "Use pseudolabels from foundation model for replay data in multihead finetuning",
         type=str2bool,
         default=False,
     )
     parser.add_argument(
         "--pseudolabel_replay_compute_stress",
-        help="When replay pseudolabels are generated, always generate stress labels even if the original replay data lacked stress",
+        help=
+        "When replay pseudolabels are generated, always generate stress labels even if the original replay data lacked stress",
         type=str2bool,
         default=False,
     )
@@ -579,7 +593,8 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--real_pt_data_ratio_threshold",
-        help="threshold of real data to replay data below which real data (sum over all real heads) is duplicated",
+        help=
+        "threshold of real data to replay data below which real data (sum over all real heads) is duplicated",
         type=float,
         default=0.1,
     )
@@ -609,7 +624,8 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--disallow_random_padding_pt",
-        help="do not allow random padding of the configurations to match the number of samples",
+        help=
+        "do not allow random padding of the configurations to match the number of samples",
         action="store_false",
         dest="allow_random_padding_pt",
     )
@@ -622,6 +638,12 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--pt_valid_file",
         help="Validation set file for the pretrained head",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--pt_statistics_file",
+        help="json file containing statistics for the pretrained head",
         type=str,
         default=None,
     )
@@ -725,25 +747,23 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--embedding_specs",
-        help=(
-            "Dict of feature‐spec dictionaries. "
-            "embedding_specs:\n"
-            "  total_spin:\n"
-            "    type: categorical\n"
-            "    per: graph\n"
-            "    num_classes: 101\n"
-            "    emb_dim: 64\n"
-            "  total_charge:\n"
-            "    type: categorical\n"
-            "    per: graph\n"
-            "    num_classes: 201\n"
-            "    emb_dim: 64\n"
-            "  temperature:\n"
-            "    type: continuous\n"
-            "    per: graph\n"
-            "    in_dim: 1\n"
-            "    emb_dim: 32\n"
-        ),
+        help=("Dict of feature‐spec dictionaries. "
+              "embedding_specs:\n"
+              "  total_spin:\n"
+              "    type: categorical\n"
+              "    per: graph\n"
+              "    num_classes: 101\n"
+              "    emb_dim: 64\n"
+              "  total_charge:\n"
+              "    type: categorical\n"
+              "    per: graph\n"
+              "    num_classes: 201\n"
+              "    emb_dim: 64\n"
+              "  temperature:\n"
+              "    type: continuous\n"
+              "    per: graph\n"
+              "    in_dim: 1\n"
+              "    emb_dim: 32\n"),
         default=None,
     )
     parser.add_argument(
@@ -772,57 +792,67 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
             "l1l2energyforces",
         ],
     )
-    parser.add_argument(
-        "--forces_weight", help="weight of forces loss", type=float, default=100.0
-    )
+    parser.add_argument("--forces_weight",
+                        help="weight of forces loss",
+                        type=float,
+                        default=100.0)
     parser.add_argument(
         "--swa_forces_weight",
         "--stage_two_forces_weight",
-        help="weight of forces loss after starting Stage Two (previously called swa)",
+        help=
+        "weight of forces loss after starting Stage Two (previously called swa)",
         type=float,
         default=100.0,
         dest="swa_forces_weight",
     )
-    parser.add_argument(
-        "--energy_weight", help="weight of energy loss", type=float, default=1.0
-    )
+    parser.add_argument("--energy_weight",
+                        help="weight of energy loss",
+                        type=float,
+                        default=1.0)
     parser.add_argument(
         "--swa_energy_weight",
         "--stage_two_energy_weight",
-        help="weight of energy loss after starting Stage Two (previously called swa)",
+        help=
+        "weight of energy loss after starting Stage Two (previously called swa)",
         type=float,
         default=1000.0,
         dest="swa_energy_weight",
     )
-    parser.add_argument(
-        "--virials_weight", help="weight of virials loss", type=float, default=1.0
-    )
+    parser.add_argument("--virials_weight",
+                        help="weight of virials loss",
+                        type=float,
+                        default=1.0)
     parser.add_argument(
         "--swa_virials_weight",
         "--stage_two_virials_weight",
-        help="weight of virials loss after starting Stage Two (previously called swa)",
+        help=
+        "weight of virials loss after starting Stage Two (previously called swa)",
         type=float,
         default=10.0,
         dest="swa_virials_weight",
     )
-    parser.add_argument(
-        "--stress_weight", help="weight of stress loss", type=float, default=1.0
-    )
+    parser.add_argument("--stress_weight",
+                        help="weight of stress loss",
+                        type=float,
+                        default=1.0)
     parser.add_argument(
         "--swa_stress_weight",
         "--stage_two_stress_weight",
-        help="weight of stress loss after starting Stage Two (previously called swa)",
+        help=
+        "weight of stress loss after starting Stage Two (previously called swa)",
         type=float,
         default=10.0,
         dest="swa_stress_weight",
     )
-    parser.add_argument(
-        "--dipole_weight", help="weight of dipoles loss", type=float, default=1.0
-    )
+    parser.add_argument("--dipole_weight",
+                        help="weight of dipoles loss",
+                        type=float,
+                        default=1.0)
     parser.add_argument(
         "--swa_dipole_weight",
         "--stage_two_dipole_weight",
-        help="weight of dipoles after starting Stage Two (previously called swa)",
+        help=
+        "weight of dipoles after starting Stage Two (previously called swa)",
         type=float,
         default=1.0,
         dest="swa_dipole_weight",
@@ -830,7 +860,8 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--swa_polarizability_weight",
         "--stage_two_polarizability_weight",
-        help="weight of polarizability after starting Stage Two (previously called swa)",
+        help=
+        "weight of polarizability after starting Stage Two (previously called swa)",
         type=float,
         default=1.0,
         dest="swa_polarizability_weight",
@@ -878,13 +909,18 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.98,
     )
-    parser.add_argument("--batch_size", help="batch size", type=int, default=10)
-    parser.add_argument(
-        "--valid_batch_size", help="Validation batch size", type=int, default=10
-    )
-    parser.add_argument(
-        "--lr", help="Learning rate of optimizer", type=float, default=0.01
-    )
+    parser.add_argument("--batch_size",
+                        help="batch size",
+                        type=int,
+                        default=10)
+    parser.add_argument("--valid_batch_size",
+                        help="Validation batch size",
+                        type=int,
+                        default=10)
+    parser.add_argument("--lr",
+                        help="Learning rate of optimizer",
+                        type=float,
+                        default=0.01)
     parser.add_argument(
         "--swa_lr",
         "--stage_two_lr",
@@ -893,18 +929,21 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         default=1e-3,
         dest="swa_lr",
     )
-    parser.add_argument(
-        "--weight_decay", help="weight decay (L2 penalty)", type=float, default=5e-7
-    )
+    parser.add_argument("--weight_decay",
+                        help="weight decay (L2 penalty)",
+                        type=float,
+                        default=5e-7)
     parser.add_argument(
         "--lr_params_factors",
         help="Learning rate factors to multiply on the original lr",
         type=str,
-        default='{"embedding_lr_factor": 1.0, "interactions_lr_factor": 1.0, "products_lr_factor": 1.0, "readouts_lr_factor": 1.0}',
+        default=
+        '{"embedding_lr_factor": 1.0, "interactions_lr_factor": 1.0, "products_lr_factor": 1.0, "readouts_lr_factor": 1.0}',
     )
     parser.add_argument(
         "--freeze",
-        help="Freeze layers from 1 to N. Can be positive or negative, e.g. -1 means the last layer is frozen. 0 or None means all layers are active and is a default setting",
+        help=
+        "Freeze layers from 1 to N. Can be positive or negative, e.g. -1 means the last layer is frozen. 0 or None means all layers are active and is a default setting",
         type=int,
         default=None,
     )
@@ -914,15 +953,18 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=True,
     )
-    parser.add_argument(
-        "--scheduler", help="Type of scheduler", type=str, default="ReduceLROnPlateau"
-    )
-    parser.add_argument(
-        "--lr_factor", help="Learning rate factor", type=float, default=0.8
-    )
-    parser.add_argument(
-        "--scheduler_patience", help="Learning rate factor", type=int, default=50
-    )
+    parser.add_argument("--scheduler",
+                        help="Type of scheduler",
+                        type=str,
+                        default="ReduceLROnPlateau")
+    parser.add_argument("--lr_factor",
+                        help="Learning rate factor",
+                        type=float,
+                        default=0.8)
+    parser.add_argument("--scheduler_patience",
+                        help="Learning rate factor",
+                        type=int,
+                        default=50)
     parser.add_argument(
         "--lr_scheduler_gamma",
         help="Gamma of learning rate scheduler",
@@ -932,7 +974,8 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--swa",
         "--stage_two",
-        help="use Stage Two loss weight, which decreases the learning rate and increases the energy weight at the end of the training to help converge them",
+        help=
+        "use Stage Two loss weight, which decreases the learning rate and increases the energy weight at the end of the training to help converge them",
         action="store_true",
         default=False,
         dest="swa",
@@ -963,9 +1006,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.99,
     )
-    parser.add_argument(
-        "--max_num_epochs", help="Maximum number of epochs", type=int, default=2048
-    )
+    parser.add_argument("--max_num_epochs",
+                        help="Maximum number of epochs",
+                        type=int,
+                        default=2048)
     parser.add_argument(
         "--patience",
         help="Maximum number of consecutive epochs of increasing loss",
@@ -990,9 +1034,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         action="store_false",
         default=True,
     )
-    parser.add_argument(
-        "--eval_interval", help="evaluate model every <n> epochs", type=int, default=1
-    )
+    parser.add_argument("--eval_interval",
+                        help="evaluate model every <n> epochs",
+                        type=int,
+                        default=1)
     parser.add_argument(
         "--keep_checkpoints",
         help="keep all checkpoints",
@@ -1059,7 +1104,8 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--wandb_dir",
-        help="An absolute path to a directory where Weights and Biases metadata will be stored",
+        help=
+        "An absolute path to a directory where Weights and Biases metadata will be stored",
         type=str,
         default=None,
     )
@@ -1118,8 +1164,7 @@ def build_preprocess_arg_parser() -> argparse.ArgumentParser:
         )
     except ImportError:
         parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        )
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter, )
     parser.add_argument(
         "--train_file",
         help="Training set h5 file",
@@ -1136,7 +1181,8 @@ def build_preprocess_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--num_process",
-        help="The user defined number of processes to use, as well as the number of files created.",
+        help=
+        "The user defined number of processes to use, as well as the number of files created.",
         type=int,
         default=int(os.cpu_count() / 4),
     )
@@ -1166,9 +1212,10 @@ def build_preprocess_arg_parser() -> argparse.ArgumentParser:
         type=str,
         default="",
     )
-    parser.add_argument(
-        "--r_max", help="distance cutoff (in Ang)", type=float, default=5.0
-    )
+    parser.add_argument("--r_max",
+                        help="distance cutoff (in Ang)",
+                        type=float,
+                        default=5.0)
     parser.add_argument(
         "--config_type_weights",
         help="String of dictionary containing the weights for each config type",
@@ -1285,8 +1332,7 @@ def check_float_or_none(value: str) -> Optional[float]:
     except ValueError:
         if value != "None":
             raise argparse.ArgumentTypeError(
-                f"{value} is an invalid value (float or None)"
-            ) from None
+                f"{value} is an invalid value (float or None)") from None
         return None
 
 
@@ -1312,5 +1358,4 @@ def read_yaml(value: str) -> Dict:
             return yaml.safe_load(file)
         except yaml.YAMLError as exc:
             raise argparse.ArgumentTypeError(
-                f"Error parsing YAML file {value}: {exc}"
-            ) from exc
+                f"Error parsing YAML file {value}: {exc}") from exc
