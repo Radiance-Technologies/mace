@@ -260,30 +260,6 @@ def run(args) -> None:
         if args.multiheads_finetuning and head_config.head_name == "pt_head":
             head_config.atomic_numbers = None
 
-            if args.pt_statistics_file is not None:
-                with open(head_config.statistics_file, "r") as f:  # pylint: disable=W1514
-                    statistics = json.load(f)
-                logging.info("Using statistics json file")
-                head_config.atomic_numbers = statistics["atomic_numbers"]
-                head_config.mean = statistics["mean"]
-                head_config.std = statistics["std"]
-                head_config.avg_num_neighbors = statistics["avg_num_neighbors"]
-                head_config.compute_avg_num_neighbors = False
-                if isinstance(statistics["atomic_energies"],
-                              str) and statistics["atomic_energies"].endswith(
-                                  ".json"):
-                    with open(statistics["atomic_energies"],
-                              "r",
-                              encoding="utf-8") as f:
-                        atomic_energies = json.load(f)
-                    head_config.E0s = atomic_energies
-                    head_config.atomic_energies_dict = ast.literal_eval(
-                        atomic_energies)
-                else:
-                    head_config.E0s = statistics["atomic_energies"]
-                    head_config.atomic_energies_dict = ast.literal_eval(
-                        statistics["atomic_energies"])
-
         # Handle train_file and valid_file - normalize to lists
         if hasattr(head_config,
                    "train_file") and head_config.train_file is not None:
@@ -297,8 +273,9 @@ def run(args) -> None:
                    "test_file") and head_config.test_file is not None:
             head_config.test_file = normalize_file_paths(head_config.test_file)
 
-        if (head_config.statistics_file is not None
-                and head_config.head_name != "pt_head"):
+        if (head_config.statistics_file is not None and
+            (head_config.head_name != "pt_head" or args.multiheads_finetuning
+             and args.pt_statistics_file is not None)):
             with open(head_config.statistics_file, "r") as f:  # pylint: disable=W1514
                 statistics = json.load(f)
             logging.info("Using statistics json file")
@@ -399,7 +376,7 @@ def run(args) -> None:
         logging.info(
             "==================Using multiheads finetuning mode=================="
         )
-        args.loss = "universal"
+        # args.loss = "universal"
 
         all_ase_readable = all(
             all(check_path_ase_read(f) for f in head_config.train_file)
@@ -423,6 +400,7 @@ def run(args) -> None:
                     head_config.collections.train += (
                         head_config.collections.train *
                         int(args.real_pt_data_ratio_threshold / ratio_pt_ft))
+
             logging.info(
                 f"Total number of configurations in pretraining: train={len(head_config_pt.collections.train)}, valid={len(head_config_pt.collections.valid)}"
             )
