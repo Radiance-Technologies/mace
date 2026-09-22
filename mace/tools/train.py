@@ -68,6 +68,16 @@ def valid_err_log(
         logging.info(
             f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, RMSE_E_per_atom={error_e:8.2f} meV, RMSE_F={error_f:8.2f} meV / A"
         )
+    elif (log_errors == "PerAtomRMSEuncertainty"
+          and eval_metrics["mean_energy_std_per_atom"] is not None
+          and eval_metrics["mean_force_std"] is not None):
+        error_e = eval_metrics["rmse_e_per_atom"] * 1e3
+        error_f = eval_metrics["rmse_f"] * 1e3
+        std_e = eval_metrics["mean_energy_std_per_atom"] * 1e3
+        std_f = eval_metrics["mean_force_std"] * 1e3
+        logging.info(
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, RMSE_E_per_atom={error_e:8.2f} meV, STD_E_per_atom={std_e:8.2f} meV, RMSE_F={error_f:8.2f} meV / A, STD_F={std_f:8.2f} meV / A"
+        )
     elif (log_errors == "PerAtomRMSEstressvirials"
           and eval_metrics["rmse_stress"] is not None):
         error_e = eval_metrics["rmse_e_per_atom"] * 1e3
@@ -84,8 +94,36 @@ def valid_err_log(
         logging.info(
             f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, RMSE_E_per_atom={error_e:8.2f} meV, RMSE_F={error_f:8.2f} meV / A, RMSE_virials_per_atom={error_virials:8.2f} meV",
         )
+    elif (log_errors == "PerAtomRMSEstressvirialsuncertainty"
+          and eval_metrics["rmse_stress"] is not None
+          and eval_metrics["mean_energy_std_per_atom"] is not None
+          and eval_metrics["mean_force_std"] is not None
+          and eval_metrics["mean_stress_std"] is not None):
+        error_e = eval_metrics["rmse_e_per_atom"] * 1e3
+        error_f = eval_metrics["rmse_f"] * 1e3
+        error_stress = eval_metrics["rmse_stress"] * 1e3
+        std_e = eval_metrics["mean_energy_std_per_atom"] * 1e3
+        std_f = eval_metrics["mean_force_std"] * 1e3
+        std_stress = eval_metrics["mean_stress_std"] * 1e3
+        logging.info(
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, RMSE_E_per_atom={error_e:8.2f} meV, STD_E_per_atom={std_e:8.2f} meV, RMSE_F={error_f:8.2f} meV / A, STD_F={std_f:8.2f} meV / A, RMSE_stress={error_stress:8.2f} meV / A^3, STD_stress={std_stress:8.2f} meV / A^3",
+        )
+    elif (log_errors == "PerAtomRMSEstressvirialsuncertainty"
+          and eval_metrics["rmse_virials_per_atom"] is not None
+          and eval_metrics["mean_energy_std_per_atom"] is not None
+          and eval_metrics["mean_force_std"] is not None
+          and eval_metrics["mean_virials_std_per_atom"] is not None):
+        error_e = eval_metrics["rmse_e_per_atom"] * 1e3
+        error_f = eval_metrics["rmse_f"] * 1e3
+        error_virials = eval_metrics["rmse_virials_per_atom"] * 1e3
+        std_e = eval_metrics["mean_energy_std_per_atom"] * 1e3
+        std_f = eval_metrics["mean_force_std"] * 1e3
+        std_virials = eval_metrics["mean_virials_std_per_atom"] * 1e3
+        logging.info(
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, RMSE_E_per_atom={error_e:8.2f} meV, STD_E_per_atom={std_e:8.2f} meV, RMSE_F={error_f:8.2f} meV / A, STD_F={std_f:8.2f} meV / A, RMSE_virials_per_atom={error_virials:8.2f} meV, STD_virials_per_atom={std_virials:8.2f} meV",
+        )
     elif (log_errors == "PerAtomMAEstressvirials"
-          and eval_metrics["mae_stress_per_atom"] is not None):
+          and eval_metrics["mae_stress"] is not None):
         error_e = eval_metrics["mae_e_per_atom"] * 1e3
         error_f = eval_metrics["mae_f"] * 1e3
         error_stress = eval_metrics["mae_stress"] * 1e3
@@ -96,9 +134,37 @@ def valid_err_log(
           and eval_metrics["mae_virials_per_atom"] is not None):
         error_e = eval_metrics["mae_e_per_atom"] * 1e3
         error_f = eval_metrics["mae_f"] * 1e3
-        error_virials = eval_metrics["mae_virials"] * 1e3
+        error_virials = eval_metrics["mae_virials_per_atom"] * 1e3
         logging.info(
-            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, MAE_E_per_atom={error_e:8.2f} meV, MAE_F={error_f:8.2f} meV / A, MAE_virials={error_virials:8.2f} meV"
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, MAE_E_per_atom={error_e:8.2f} meV, MAE_F={error_f:8.2f} meV / A, MAE_virials_per_atom={error_virials:8.2f} meV"
+        )
+    elif (log_errors == "PerAtomMAEstressvirialsuncertainty"
+          and eval_metrics["mae_stress"] is not None
+          and eval_metrics["mean_energy_std_per_atom"] is not None
+          and eval_metrics["mean_force_std"] is not None
+          and eval_metrics["mean_stress_std"] is not None):
+        error_e = eval_metrics["mae_e_per_atom"] * 1e3
+        error_f = eval_metrics["mae_f"] * 1e3
+        error_stress = eval_metrics["mae_stress"] * 1e3
+        std_e = eval_metrics["mean_energy_std_per_atom"] * 1e3
+        std_f = eval_metrics["mean_force_std"] * 1e3
+        std_stress = eval_metrics["mean_stress_std"] * 1e3
+        logging.info(
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, MAE_E_per_atom={error_e:8.2f} meV, STD_E_per_atom={std_e:8.2f} meV, MAE_F={error_f:8.2f} meV / A, STD_F={std_f:8.2f} meV / A, MAE_stress={error_stress:8.2f} meV / A^3, STD_stress={std_stress:8.2f} meV / A^3"
+        )
+    elif (log_errors == "PerAtomMAEstressvirialsuncertainty"
+          and eval_metrics["mae_virials_per_atom"] is not None
+          and eval_metrics["mean_energy_std_per_atom"] is not None
+          and eval_metrics["mean_force_std"] is not None
+          and eval_metrics["mean_virials_std_per_atom"] is not None):
+        error_e = eval_metrics["mae_e_per_atom"] * 1e3
+        error_f = eval_metrics["mae_f"] * 1e3
+        error_virials = eval_metrics["mae_virials_per_atom"] * 1e3
+        std_e = eval_metrics["mean_energy_std_per_atom"] * 1e3
+        std_f = eval_metrics["mean_force_std"] * 1e3
+        std_virials = eval_metrics["mean_virials_std_per_atom"] * 1e3
+        logging.info(
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, MAE_E_per_atom={error_e:8.2f} meV, STD_E={std_e:8.2f} meV, MAE_F={error_f:8.2f} meV / A, STD_F={std_f:8.2f} meV / A, MAE_virials_per_atom={error_virials:8.2f} meV, STD_virials_per_atom={std_virials:8.2f} meV"
         )
     elif log_errors == "TotalRMSE":
         error_e = eval_metrics["rmse_e"] * 1e3
@@ -117,6 +183,36 @@ def valid_err_log(
         error_f = eval_metrics["mae_f"] * 1e3
         logging.info(
             f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, MAE_E={error_e:8.2f} meV, MAE_F={error_f:8.2f} meV / A",
+        )
+    elif (log_errors == "TotalRMSEuncertainty"
+          and eval_metrics["mean_energy_std"] is not None
+          and eval_metrics["mean_force_std"] is not None):
+        error_e = eval_metrics["rmse_e"] * 1e3
+        error_f = eval_metrics["rmse_f"] * 1e3
+        std_e = eval_metrics["mean_energy_std"] * 1e3
+        std_f = eval_metrics["mean_force_std"] * 1e3
+        logging.info(
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, RMSE_E={error_e:8.2f} meV, STD_E={std_e:8.2f} meV, RMSE_F={error_f:8.2f} meV / A, STD_F={std_f:8.2f} meV / A",
+        )
+    elif (log_errors == "PerAtomMAEuncertainty"
+          and eval_metrics["mean_energy_std_per_atom"] is not None
+          and eval_metrics["mean_force_std"] is not None):
+        error_e = eval_metrics["mae_e_per_atom"] * 1e3
+        error_f = eval_metrics["mae_f"] * 1e3
+        std_e = eval_metrics["mean_energy_std_per_atom"] * 1e3
+        std_f = eval_metrics["mean_force_std"] * 1e3
+        logging.info(
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, MAE_E_per_atom={error_e:8.2f} meV, STD_E_per_atom={std_e:8.2f} meV, MAE_F={error_f:8.2f} meV / A, STD_F={std_f:8.2f} meV / A",
+        )
+    elif (log_errors == "TotalMAEuncertainty"
+          and eval_metrics["mean_energy_std"] is not None
+          and eval_metrics["mean_force_std"] is not None):
+        error_e = eval_metrics["mae_e"] * 1e3
+        error_f = eval_metrics["mae_f"] * 1e3
+        std_e = eval_metrics["mean_energy_std"] * 1e3
+        std_f = eval_metrics["mean_force_std"] * 1e3
+        logging.info(
+            f"{inintial_phrase}: head: {valid_loader_name}, loss={valid_loss:8.8f}, MAE_E={error_e:8.2f} meV, STD_E={std_e:8.2f} meV, MAE_F={error_f:8.2f} meV / A, STD_F={std_f:8.2f} meV / A",
         )
     elif log_errors == "DipoleRMSE":
         error_mu = eval_metrics["rmse_mu_per_atom"] * 1e3
@@ -606,6 +702,10 @@ class MACELoss(Metric):
                        dist_reduce_fx="sum")
         self.add_state("fs", default=[], dist_reduce_fx="cat")
         self.add_state("delta_fs", default=[], dist_reduce_fx="cat")
+        self.add_state("forces_uncertainty_computed",
+                       default=torch.tensor(0.0),
+                       dist_reduce_fx="sum")
+        self.add_state("forces_var_logits", default=[], dist_reduce_fx="cat")
         self.add_state("stress_computed",
                        default=torch.tensor(0.0),
                        dist_reduce_fx="sum")
@@ -645,6 +745,19 @@ class MACELoss(Metric):
             self.E_computed += filter_nonzero_weight(batch, self.delta_es,
                                                      batch.weight,
                                                      batch.energy_weight)
+
+        if output.get("energy_var_logits") is not None:
+            logits = output["energy_var_logits"].detach()
+            self.energy_var_logits.append(logits)
+            self.energy_var_logits_per_atom.append(
+                logits / (batch.ptr[1:] - batch.ptr[:-1]))
+            self.energy_uncertainty_computed += filter_nonzero_weight(
+                batch,
+                self.energy_var_logits,
+                batch.weight,
+                batch.energy_weight,
+            )
+
         if output.get("forces") is not None and batch.forces is not None:
             self.fs.append(batch.forces)
             self.delta_fs.append(batch.forces - output["forces"])
@@ -655,10 +768,31 @@ class MACELoss(Metric):
                 batch.forces_weight,
                 spread_atoms=True,
             )
+
+        if output.get("forces_var_logits") is not None:
+            self.forces_var_logits.append(output["forces_var_logits"].detach())
+            self.forces_uncertainty_computed += filter_nonzero_weight(
+                batch,
+                self.forces_var_logits,
+                batch.weight,
+                batch.forces_weight,
+                spread_atoms=True,
+            )
+
         if output.get("stress") is not None and batch.stress is not None:
             self.delta_stress.append(batch.stress - output["stress"])
             self.stress_computed += filter_nonzero_weight(
                 batch, self.delta_stress, batch.weight, batch.stress_weight)
+
+        if output.get("stress_var_logits") is not None:
+            self.stress_var_logits.append(output["stress_var_logits"].detach())
+            self.stress_uncertainty_computed += filter_nonzero_weight(
+                batch,
+                self.stress_var_logits,
+                batch.weight,
+                batch.stress_weight,
+            )
+
         if output.get("virials") is not None and batch.virials is not None:
             self.delta_virials.append(batch.virials - output["virials"])
             self.delta_virials_per_atom.append(
@@ -666,6 +800,20 @@ class MACELoss(Metric):
                 (batch.ptr[1:] - batch.ptr[:-1]).view(-1, 1, 1))
             self.virials_computed += filter_nonzero_weight(
                 batch, self.delta_virials, batch.weight, batch.virials_weight)
+
+        if output.get("virials_var_logits") is not None:
+            logits = output["virials_var_logits"].detach()
+            self.virials_var_logits.append(logits)
+            self.virials_var_logits_per_atom.append(
+                logits / (batch.ptr[1:] - batch.ptr[:-1]).view(-1, 1, 1))
+
+            self.virials_uncertainty_computed += filter_nonzero_weight(
+                batch,
+                self.virials_var_logits,
+                batch.weight,
+                batch.virials_weight,
+            )
+
         if output.get("dipole") is not None and batch.dipole is not None:
             self.mus.append(batch.dipole)
             self.delta_mus.append(batch.dipole - output["dipole"])
@@ -718,6 +866,11 @@ class MACELoss(Metric):
 
         aux = defaultdict(NoneMultiply)
         aux["loss"] = to_numpy(self.total_loss / self.num_data).item()
+
+        eps = (self.loss_fn.eps.item() if hasattr(self.loss_fn, "eps")
+               and isinstance(self.loss_fn.eps, torch.Tensor) else getattr(
+                   self.loss_fn, "eps", 1e-6))
+
         if self.E_computed:
             delta_es = self.convert(self.delta_es)
             delta_es_per_atom = self.convert(self.delta_es_per_atom)
@@ -726,6 +879,17 @@ class MACELoss(Metric):
             aux["rmse_e"] = compute_rmse(delta_es)
             aux["rmse_e_per_atom"] = compute_rmse(delta_es_per_atom)
             aux["q95_e"] = compute_q95(delta_es)
+
+        if self.energy_uncertainty_computed:
+            logits = self.convert(self.energy_var_logits)
+            var = np.log1p(np.exp(logits)) + eps
+            std = np.sqrt(var)
+            logits_per_atom = self.convert(self.energy_var_logits_per_atom)
+            var_per_atom = np.log1p(np.exp(logits_per_atom)) + eps
+            std_per_atom = np.sqrt(var_per_atom)
+            aux["mean_energy_var_per_atom"] = float(np.mean(var_per_atom))
+            aux["mean_energy_std_per_atom"] = float(np.mean(std_per_atom))
+
         if self.Fs_computed:
             fs = self.convert(self.fs)
             delta_fs = self.convert(self.delta_fs)
@@ -734,18 +898,48 @@ class MACELoss(Metric):
             aux["rmse_f"] = compute_rmse(delta_fs)
             aux["rel_rmse_f"] = compute_rel_rmse(delta_fs, fs)
             aux["q95_f"] = compute_q95(delta_fs)
+
+        if self.forces_uncertainty_computed:
+            logits = self.convert(self.forces_var_logits)
+            var = np.log1p(np.exp(logits)) + eps
+            std = np.sqrt(var)
+            aux["mean_force_var"] = float(np.mean(var))
+            aux["mean_force_std"] = float(np.mean(std))
+
         if self.stress_computed:
             delta_stress = self.convert(self.delta_stress)
             aux["mae_stress"] = compute_mae(delta_stress)
             aux["rmse_stress"] = compute_rmse(delta_stress)
             aux["q95_stress"] = compute_q95(delta_stress)
+
+        if self.stress_uncertainty_computed:
+            logits = self.convert(self.stress_var_logits)
+            var = np.log1p(np.exp(logits)) + eps
+            std = np.sqrt(var)
+            aux["mean_stress_var"] = float(np.mean(var))
+            aux["mean_stress_std"] = float(np.mean(std))
+
         if self.virials_computed:
             delta_virials = self.convert(self.delta_virials)
             delta_virials_per_atom = self.convert(self.delta_virials_per_atom)
             aux["mae_virials"] = compute_mae(delta_virials)
+            aux["mae_virials_per_atom"] = compute_mae(delta_virials_per_atom)
             aux["rmse_virials"] = compute_rmse(delta_virials)
             aux["rmse_virials_per_atom"] = compute_rmse(delta_virials_per_atom)
             aux["q95_virials"] = compute_q95(delta_virials)
+
+        if self.virials_uncertainty_computed:
+            logits = self.convert(self.virials_var_logits)
+            var = np.log1p(np.exp(logits)) + eps
+            std = np.sqrt(var)
+            aux["mean_virials_var"] = float(np.mean(var))
+            aux["mean_virials_std"] = float(np.mean(std))
+            logits_per_atom = self.convert(self.virials_var_logits_per_atom)
+            var_per_atom = np.log1p(np.exp(logits_per_atom)) + eps
+            std_per_atom = np.sqrt(var_per_atom)
+            aux["mean_virials_var_per_atom"] = float(np.mean(var_per_atom))
+            aux["mean_virials_std_per_atom"] = float(np.mean(std_per_atom))
+
         if self.Mus_computed:
             mus = self.convert(self.mus)
             delta_mus = self.convert(self.delta_mus)

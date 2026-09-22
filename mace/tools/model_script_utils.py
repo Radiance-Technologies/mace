@@ -32,12 +32,21 @@ def configure_model(
         args.compute_stress = True
 
     if compute_virials or compute_stress:
-        if args.error_table in ["PerAtomRMSE", "PerAtomMAE", "TotalRMSE", "TotalMAE"]:
-            args.error_table = (
-                "PerAtomRMSEstressvirials"
-                if "RMSE" in args.error_table
-                else "PerAtomMAEstressvirials"
-            )
+        if args.error_table in [
+                "PerAtomRMSE", "PerAtomMAE", "TotalRMSE", "TotalMAE"
+        ]:
+            if args.compute_uncertainty:
+                args.error_table = ("PerAtomRMSEstressvirialsuncertainty"
+                                    if "RMSE" in args.error_table else
+                                    "PerAtomMAEstressvirialsuncertainty")
+            else:
+                args.error_table = ("PerAtomRMSEstressvirials"
+                                    if "RMSE" in args.error_table else
+                                    "PerAtomMAEstressvirials")
+    elif args.compute_uncertainty and args.error_table in [
+            "PerAtomRMSE", "PerAtomMAE", "TotalRMSE", "TotalMAE"
+    ]:
+        args.error_table += "uncertainty"
 
     output_args = {
         "energy": args.compute_energy,
@@ -46,6 +55,7 @@ def configure_model(
         "stress": compute_stress,
         "dipoles": args.compute_dipole,
         "polarizabilities": args.compute_polarizability,
+        "uncertainty": args.compute_uncertainty,
     }
     logging.info(
         f"During training the following quantities will be reported: {', '.join([f'{report}' for report, value in output_args.items() if value])}"
@@ -59,36 +69,31 @@ def configure_model(
                 head_config.std = 1.0
         logging.info("No scaling selected")
 
-    if (
-        head_configs is not None
-        and args.std is not None
-        and not isinstance(args.std, list)
-    ):
+    if (head_configs is not None and args.std is not None
+            and not isinstance(args.std, list)):
         atomic_inter_scale = []
         for head_config in head_configs:
             if hasattr(head_config, "std") and head_config.std is not None:
                 atomic_inter_scale.append(head_config.std)
             elif args.std is not None:
                 atomic_inter_scale.append(
-                    args.std if isinstance(args.std, float) else 1.0
-                )
+                    args.std if isinstance(args.std, float) else 1.0)
         args.std = atomic_inter_scale
 
-    elif (args.mean is None or args.std is None) and (
-        args.model not in ("AtomicDipolesMACE", "AtomicDielectricMACE")
-    ):
+    elif (args.mean is None or args.std is None) and (args.model not in (
+            "AtomicDipolesMACE", "AtomicDielectricMACE")):
         args.mean, args.std = modules.scaling_classes[args.scaling](
-            train_loader, atomic_energies
-        )
+            train_loader, atomic_energies)
     if args.embedding_specs is not None:
-        logging.info("Using embedding specifications from command line arguments")
+        logging.info(
+            "Using embedding specifications from command line arguments")
         logging.info(f"Embedding specifications: {args.embedding_specs}")
     # Build model
     if model_foundation is not None and args.model in [
-        "MACE",
-        "ScaleShiftMACE",
-        "MACELES",
-        "PolarMACE",
+            "MACE",
+            "ScaleShiftMACE",
+            "MACELES",
+            "PolarMACE",
     ]:
         logging.info("Loading FOUNDATION model")
         model_config_foundation = extract_config_mace_model(model_foundation)
@@ -96,8 +101,7 @@ def configure_model(
 
         if args.foundation_model_elements:
             foundation_z_table = AtomicNumberTable(
-                [int(z) for z in model_foundation.atomic_numbers]
-            )
+                [int(z) for z in model_foundation.atomic_numbers])
             model_config_foundation["atomic_numbers"] = foundation_z_table.zs
             model_config_foundation["num_elements"] = len(foundation_z_table)
             z_table = foundation_z_table
@@ -112,15 +116,14 @@ def configure_model(
         args.max_L = model_config_foundation["hidden_irreps"].lmax
 
         if args.model in (
-            "ScaleShiftMACE",
-            "PolarMACE",
+                "ScaleShiftMACE",
+                "PolarMACE",
         ) or model_foundation.__class__.__name__ in (
-            "ScaleShiftMACE",
-            "PolarMACE",
+                "ScaleShiftMACE",
+                "PolarMACE",
         ):
             model_config_foundation["atomic_inter_shift"] = (
-                _determine_atomic_inter_shift(args.mean, heads)
-            )
+                _determine_atomic_inter_shift(args.mean, heads))
         else:
             model_config_foundation["atomic_inter_shift"] = [0.0] * len(heads)
         model_config_foundation["atomic_inter_scale"] = [1.0] * len(heads)
@@ -165,7 +168,8 @@ def configure_model(
         )
 
         assert (
-            len({irrep.mul for irrep in o3.Irreps(args.hidden_irreps)}) == 1
+            len({irrep.mul
+                 for irrep in o3.Irreps(args.hidden_irreps)}) == 1
         ), "All channels must have the same dimension, use the num_channels and max_L keywords to specify the number of channels and the maximum L"
 
         logging.info(f"Hidden irreps: {args.hidden_irreps}")
@@ -190,7 +194,8 @@ def configure_model(
             num_interactions=args.num_interactions,
             num_elements=len(z_table),
             hidden_irreps=o3.Irreps(args.hidden_irreps),
-            edge_irreps=o3.Irreps(args.edge_irreps) if args.edge_irreps else None,
+            edge_irreps=o3.Irreps(args.edge_irreps)
+            if args.edge_irreps else None,
             atomic_energies=atomic_energies,
             apply_cutoff=args.apply_cutoff,
             avg_num_neighbors=args.avg_num_neighbors,
@@ -244,13 +249,11 @@ def _parse_literal_or_none(value):
     return value
 
 
-def _build_model(
-    args, model_config, model_config_foundation, heads
-):  # pylint: disable=too-many-return-statements
+def _build_model(args, model_config, model_config_foundation, heads):  # pylint: disable=too-many-return-statements
     if args.model == "MACE":
         if args.interaction_first not in [
-            "RealAgnosticInteractionBlock",
-            "RealAgnosticDensityInteractionBlock",
+                "RealAgnosticInteractionBlock",
+                "RealAgnosticDensityInteractionBlock",
         ]:
             args.interaction_first = "RealAgnosticInteractionBlock"
         return modules.ScaleShiftMACE(
@@ -259,7 +262,8 @@ def _build_model(
             distance_transform=args.distance_transform,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
-            interaction_cls_first=modules.interaction_classes[args.interaction_first],
+            interaction_cls_first=modules.interaction_classes[
+                args.interaction_first],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=[0.0] * len(heads),
@@ -270,6 +274,7 @@ def _build_model(
             use_embedding_readout=args.use_embedding_readout,
             use_last_readout_only=args.use_last_readout_only,
             use_agnostic_product=args.use_agnostic_product,
+            compute_uncertainty=args.compute_uncertainty,
         )
     if args.model == "ScaleShiftMACE":
         return modules.ScaleShiftMACE(
@@ -278,7 +283,8 @@ def _build_model(
             distance_transform=args.distance_transform,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
-            interaction_cls_first=modules.interaction_classes[args.interaction_first],
+            interaction_cls_first=modules.interaction_classes[
+                args.interaction_first],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=args.mean,
@@ -289,21 +295,26 @@ def _build_model(
             use_embedding_readout=args.use_embedding_readout,
             use_last_readout_only=args.use_last_readout_only,
             use_agnostic_product=args.use_agnostic_product,
+            compute_uncertainty=args.compute_uncertainty,
         )
     if args.model == "PolarMACE" and model_config_foundation is not None:
         return modules.PolarMACE(**model_config_foundation)
     if args.model == "PolarMACE":
-        field_feature_widths = _parse_literal_or_none(args.field_feature_widths)
+        field_feature_widths = _parse_literal_or_none(
+            args.field_feature_widths)
         field_feature_norms = _parse_literal_or_none(args.field_feature_norms)
-        fixedpoint_update_config = _parse_literal_or_none(args.fixedpoint_update_config)
-        field_readout_config = _parse_literal_or_none(args.field_readout_config)
+        fixedpoint_update_config = _parse_literal_or_none(
+            args.fixedpoint_update_config)
+        field_readout_config = _parse_literal_or_none(
+            args.field_readout_config)
         return modules.PolarMACE(
             **model_config,
             pair_repulsion=args.pair_repulsion,
             distance_transform=args.distance_transform,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
-            interaction_cls_first=modules.interaction_classes[args.interaction_first],
+            interaction_cls_first=modules.interaction_classes[
+                args.interaction_first],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=_determine_atomic_inter_shift(args.mean, heads),
@@ -316,21 +327,24 @@ def _build_model(
             use_agnostic_product=args.use_agnostic_product,
             kspace_cutoff_factor=args.kspace_cutoff_factor,
             atomic_multipoles_max_l=args.atomic_multipoles_max_l,
-            atomic_multipoles_smearing_width=args.atomic_multipoles_smearing_width,
+            atomic_multipoles_smearing_width=args.
+            atomic_multipoles_smearing_width,
             field_feature_max_l=args.field_feature_max_l,
-            field_feature_widths=(
-                field_feature_widths if field_feature_widths is not None else [1.0]
-            ),
+            field_feature_widths=(field_feature_widths if field_feature_widths
+                                  is not None else [1.0]),
             num_recursion_steps=args.num_recursion_steps,
             field_si=args.field_si,
-            include_electrostatic_self_interaction=args.include_electrostatic_self_interaction,
+            include_electrostatic_self_interaction=args.
+            include_electrostatic_self_interaction,
             add_local_electron_energy=args.add_local_electron_energy,
             quadrupole_feature_corrections=args.quadrupole_feature_corrections,
-            return_electrostatic_potentials=args.return_electrostatic_potentials,
+            return_electrostatic_potentials=args.
+            return_electrostatic_potentials,
             field_feature_norms=field_feature_norms,
             field_norm_factor=args.field_norm_factor,
             fixedpoint_update_config=fixedpoint_update_config,
             field_readout_config=field_readout_config,
+            compute_uncertainty=args.compute_uncertainty,
         )
     if args.model == "FoundationMACE":
         return modules.ScaleShiftMACE(**model_config_foundation)
@@ -348,25 +362,22 @@ def _build_model(
         raise RuntimeError("BOTNet is deprecated, use MACE instead")
     if args.model == "AtomicDipolesMACE":
         assert args.loss == "dipole", "Use dipole loss with AtomicDipolesMACE model"
-        assert (
-            args.error_table == "DipoleRMSE"
-        ), "Use error_table DipoleRMSE with AtomicDipolesMACE model"
+        assert (args.error_table == "DipoleRMSE"
+                ), "Use error_table DipoleRMSE with AtomicDipolesMACE model"
         return modules.AtomicDipolesMACE(
             **model_config,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
-            interaction_cls_first=modules.interaction_classes[
-                "RealAgnosticInteractionBlock"
-            ],
+            interaction_cls_first=modules.
+            interaction_classes["RealAgnosticInteractionBlock"],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
         )
 
     if args.model == "AtomicDielectricMACE":
         args.error_table = "DipolePolarRMSE"
         # std_df = modules.scaling_classes["rms_dipoles_scaling"](train_loader)
-        assert (
-            args.loss == "dipole_polar"
-        ), "Use dipole_polar loss with AtomicDielectricMACE model"
+        assert (args.loss == "dipole_polar"
+                ), "Use dipole_polar loss with AtomicDielectricMACE model"
         assert args.error_table in (
             "DipoleRMSE",
             "DipolePolarRMSE",
@@ -375,17 +386,15 @@ def _build_model(
             **model_config,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
-            interaction_cls_first=modules.interaction_classes[
-                "RealAgnosticInteractionBlock"
-            ],
+            interaction_cls_first=modules.
+            interaction_classes["RealAgnosticInteractionBlock"],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             use_polarizability=True,
         )
 
     if args.model == "EnergyDipolesMACE":
-        assert (
-            args.loss == "energy_forces_dipole"
-        ), "Use energy_forces_dipole loss with EnergyDipolesMACE model"
+        assert (args.loss == "energy_forces_dipole"
+                ), "Use energy_forces_dipole loss with EnergyDipolesMACE model"
         assert (
             args.error_table == "EnergyDipoleRMSE"
         ), "Use error_table EnergyDipoleRMSE with AtomicDipolesMACE model"
@@ -393,9 +402,8 @@ def _build_model(
             **model_config,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
-            interaction_cls_first=modules.interaction_classes[
-                "RealAgnosticInteractionBlock"
-            ],
+            interaction_cls_first=modules.
+            interaction_classes["RealAgnosticInteractionBlock"],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
         )
     if args.model == "MACELES":
@@ -408,7 +416,8 @@ def _build_model(
             distance_transform=args.distance_transform,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],
-            interaction_cls_first=modules.interaction_classes[args.interaction_first],
+            interaction_cls_first=modules.interaction_classes[
+                args.interaction_first],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=[0.0] * len(heads),
@@ -419,5 +428,6 @@ def _build_model(
             use_embedding_readout=args.use_embedding_readout,
             use_last_readout_only=args.use_last_readout_only,
             use_agnostic_product=args.use_agnostic_product,
+            compute_uncertainty=args.compute_uncertainty,
         )
     raise RuntimeError(f"Unknown model: '{args.model}'")

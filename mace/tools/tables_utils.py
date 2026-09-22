@@ -42,11 +42,29 @@ def create_error_table(
             "RMSE F / meV / A",
             "relative F RMSE %",
         ]
+    elif table_type == "TotalRMSEuncertainty":
+        table.field_names = [
+            "config_type",
+            "RMSE E / meV",
+            "STD E / meV",
+            "RMSE F / meV / A",
+            "STD F / meV / A",
+            "relative F RMSE %",
+        ]
     elif table_type == "PerAtomRMSE":
         table.field_names = [
             "config_type",
             "RMSE E / meV / atom",
             "RMSE F / meV / A",
+            "relative F RMSE %",
+        ]
+    elif table_type == "PerAtomRMSEuncertainty":
+        table.field_names = [
+            "config_type",
+            "RMSE E / meV / atom",
+            "STD E / meV / atom",
+            "RMSE F / meV / A",
+            "STD F / meV / A",
             "relative F RMSE %",
         ]
     elif table_type == "PerAtomRMSEstressvirials":
@@ -65,6 +83,28 @@ def create_error_table(
             "relative F MAE %",
             "MAE Stress (Virials) / meV / A (A^3)",
         ]
+    elif table_type == "PerAtomRMSEstressvirialsuncertainty":
+        table.field_names = [
+            "config_type",
+            "RMSE E / meV / atom",
+            "STD E / meV / atom",
+            "RMSE F / meV / A",
+            "STD F / meV / A",
+            "relative F RMSE %",
+            "RMSE Stress (Virials) / meV / A (A^3)",
+            "STD Stress (Virials) / meV / A (A^3)",
+        ]
+    elif table_type == "PerAtomMAEstressvirialsuncertainty":
+        table.field_names = [
+            "config_type",
+            "MAE E / meV / atom",
+            "STD E / meV / atom",
+            "MAE F / meV / A",
+            "STD F / meV / A",
+            "relative F MAE %",
+            "MAE Stress (Virials) / meV / A (A^3)",
+            "STD Stress (Virials) / meV / A (A^3)",
+        ]
     elif table_type == "TotalMAE":
         table.field_names = [
             "config_type",
@@ -72,11 +112,29 @@ def create_error_table(
             "MAE F / meV / A",
             "relative F MAE %",
         ]
+    elif table_type == "TotalMAEuncertainty":
+        table.field_names = [
+            "config_type",
+            "MAE E / meV",
+            "STD E / meV",
+            "MAE F / meV / A",
+            "STD F / meV / A",
+            "relative F MAE %",
+        ]
     elif table_type == "PerAtomMAE":
         table.field_names = [
             "config_type",
             "MAE E / meV / atom",
             "MAE F / meV / A",
+            "relative F MAE %",
+        ]
+    elif table_type == "PerAtomMAEuncertainty":
+        table.field_names = [
+            "config_type",
+            "MAE E / meV / atom",
+            "STD E / meV / atom",
+            "MAE F / meV / A",
+            "STD F / meV / A",
             "relative F MAE %",
         ]
     elif table_type == "DipoleRMSE":
@@ -128,135 +186,206 @@ def create_error_table(
         torch.cuda.empty_cache()
         if log_wandb:
             wandb_log_dict = {
-                name
-                + "_final_rmse_e_per_atom": metrics["rmse_e_per_atom"]
-                * 1e3,  # meV / atom
+                name + "_final_rmse_e_per_atom":
+                metrics["rmse_e_per_atom"] * 1e3,  # meV / atom
                 name + "_final_rmse_f": metrics["rmse_f"] * 1e3,  # meV / A
                 name + "_final_rel_rmse_f": metrics["rel_rmse_f"],
             }
             wandb.log(wandb_log_dict)
         if table_type == "TotalRMSE":
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['rmse_e'] * 1000:8.1f}",
-                    f"{metrics['rmse_f'] * 1000:8.1f}",
-                    f"{metrics['rel_rmse_f']:8.2f}",
-                ]
-            )
+            table.add_row([
+                name,
+                f"{metrics['rmse_e'] * 1000:8.1f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['rel_rmse_f']:8.2f}",
+            ])
+        elif (table_type == "TotalRMSEuncertainty"
+              and metrics["mean_energy_std"] is not None
+              and metrics["mean_force_std"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['rmse_e'] * 1000:8.1f}",
+                f"{metrics['mean_energy_std'] * 1000:8.2f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['rel_rmse_f']:8.2f}",
+            ])
         elif table_type == "PerAtomRMSE":
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
-                    f"{metrics['rmse_f'] * 1000:8.1f}",
-                    f"{metrics['rel_rmse_f']:8.2f}",
-                ]
-            )
-        elif (
-            table_type == "PerAtomRMSEstressvirials"
-            and metrics["rmse_stress"] is not None
-        ):
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
-                    f"{metrics['rmse_f'] * 1000:8.1f}",
-                    f"{metrics['rel_rmse_f']:8.2f}",
-                    f"{metrics['rmse_stress'] * 1000:8.1f}",
-                ]
-            )
-        elif (
-            table_type == "PerAtomRMSEstressvirials"
-            and metrics["rmse_virials"] is not None
-        ):
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
-                    f"{metrics['rmse_f'] * 1000:8.1f}",
-                    f"{metrics['rel_rmse_f']:8.2f}",
-                    f"{metrics['rmse_virials'] * 1000:8.1f}",
-                ]
-            )
-        elif (
-            table_type == "PerAtomMAEstressvirials"
-            and metrics["mae_stress"] is not None
-        ):
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
-                    f"{metrics['mae_f'] * 1000:8.1f}",
-                    f"{metrics['rel_mae_f']:8.2f}",
-                    f"{metrics['mae_stress'] * 1000:8.1f}",
-                ]
-            )
-        elif (
-            table_type == "PerAtomMAEstressvirials"
-            and metrics["mae_virials"] is not None
-        ):
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
-                    f"{metrics['mae_f'] * 1000:8.1f}",
-                    f"{metrics['rel_mae_f']:8.2f}",
-                    f"{metrics['mae_virials'] * 1000:8.1f}",
-                ]
-            )
+            table.add_row([
+                name,
+                f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['rel_rmse_f']:8.2f}",
+            ])
+        elif (table_type == "PerAtomRMSEuncertainty"
+              and metrics["mean_energy_std_per_atom"] is not None
+              and metrics["mean_force_std"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['rel_rmse_f']:8.2f}",
+            ])
+        elif (table_type == "PerAtomRMSEstressvirials"
+              and metrics["rmse_stress"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['rel_rmse_f']:8.2f}",
+                f"{metrics['rmse_stress'] * 1000:8.1f}",
+            ])
+        elif (table_type == "PerAtomRMSEstressvirials"
+              and metrics["rmse_virials_per_atom"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['rel_rmse_f']:8.2f}",
+                f"{metrics['rmse_virials_per_atom'] * 1000:8.1f}",
+            ])
+        elif (table_type == "PerAtomMAEstressvirials"
+              and metrics["mae_stress"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mae_f'] * 1000:8.1f}",
+                f"{metrics['rel_mae_f']:8.2f}",
+                f"{metrics['mae_stress'] * 1000:8.1f}",
+            ])
+        elif (table_type == "PerAtomMAEstressvirials"
+              and metrics["mae_virials_per_atom"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mae_f'] * 1000:8.1f}",
+                f"{metrics['rel_mae_f']:8.2f}",
+                f"{metrics['mae_virials_per_atom'] * 1000:8.1f}",
+            ])
+        elif (table_type == "PerAtomRMSEstressvirialsuncertainty"
+              and metrics["rmse_stress"] is not None
+              and metrics["mean_energy_std_per_atom"] is not None
+              and metrics["mean_force_std"] is not None
+              and metrics["mean_stress_std"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['rel_rmse_f']:8.2f}",
+                f"{metrics['rmse_stress'] * 1000:8.1f}",
+                f"{metrics['mean_stress_std'] * 1000:8.2f}",
+            ])
+        elif (table_type == "PerAtomRMSEstressvirialsuncertainty"
+              and metrics["rmse_virials_per_atom"] is not None
+              and metrics["mean_energy_std_per_atom"] is not None
+              and metrics["mean_force_std"] is not None
+              and metrics["mean_virials_std_per_atom"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['rel_rmse_f']:8.2f}",
+                f"{metrics['rmse_virials_per_atom'] * 1000:8.1f}",
+                f"{metrics['mean_virials_std_per_atom'] * 1000:8.2f}",
+            ])
+        elif (table_type == "PerAtomMAEstressvirialsuncertainty"
+              and metrics["mae_stress"] is not None
+              and metrics["mean_energy_std_per_atom"] is not None
+              and metrics["mean_force_std"] is not None
+              and metrics["mean_stress_std"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
+                f"{metrics['mae_f'] * 1000:8.1f}",
+                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['rel_mae_f']:8.2f}",
+                f"{metrics['mae_stress'] * 1000:8.1f}",
+                f"{metrics['mean_stress_std'] * 1000:8.2f}",
+            ])
+        elif (table_type == "PerAtomMAEstressvirialsuncertainty"
+              and metrics["mae_virials_per_atom"] is not None
+              and metrics["mean_energy_std_per_atom"] is not None
+              and metrics["mean_force_std"] is not None
+              and metrics["mean_virials_std_per_atom"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
+                f"{metrics['mae_f'] * 1000:8.1f}",
+                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['rel_mae_f']:8.2f}",
+                f"{metrics['mae_virials_per_atom'] * 1000:8.1f}",
+                f"{metrics['mean_virials_std_per_atom'] * 1000:8.2f}",
+            ])
         elif table_type == "TotalMAE":
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['mae_e'] * 1000:8.1f}",
-                    f"{metrics['mae_f'] * 1000:8.1f}",
-                    f"{metrics['rel_mae_f']:8.2f}",
-                ]
-            )
+            table.add_row([
+                name,
+                f"{metrics['mae_e'] * 1000:8.1f}",
+                f"{metrics['mae_f'] * 1000:8.1f}",
+                f"{metrics['rel_mae_f']:8.2f}",
+            ])
+        elif (table_type == "TotalMAEuncertainty"
+              and metrics["mean_energy_std"] is not None
+              and metrics["mean_force_std"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['mae_e'] * 1000:8.1f}",
+                f"{metrics['mean_energy_std'] * 1000:8.2f}",
+                f"{metrics['mae_f'] * 1000:8.1f}",
+                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['rel_mae_f']:8.2f}",
+            ])
         elif table_type == "PerAtomMAE":
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
-                    f"{metrics['mae_f'] * 1000:8.1f}",
-                    f"{metrics['rel_mae_f']:8.2f}",
-                ]
-            )
+            table.add_row([
+                name,
+                f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mae_f'] * 1000:8.1f}",
+                f"{metrics['rel_mae_f']:8.2f}",
+            ])
+        elif (table_type == "PerAtomMAEuncertainty"
+              and metrics["mean_energy_std_per_atom"] is not None
+              and metrics["mean_force_std"] is not None):
+            table.add_row([
+                name,
+                f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
+                f"{metrics['mae_f'] * 1000:8.1f}",
+                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['rel_mae_f']:8.2f}",
+            ])
         elif table_type == "DipoleRMSE":
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['rmse_mu_per_atom'] * 1000:8.2f}",
-                    f"{metrics['rel_rmse_mu']:8.1f}",
-                ]
-            )
+            table.add_row([
+                name,
+                f"{metrics['rmse_mu_per_atom'] * 1000:8.2f}",
+                f"{metrics['rel_rmse_mu']:8.1f}",
+            ])
         elif table_type == "DipoleMAE":
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['mae_mu_per_atom'] * 1000:8.2f}",
-                    f"{metrics['rel_mae_mu']:8.1f}",
-                ]
-            )
+            table.add_row([
+                name,
+                f"{metrics['mae_mu_per_atom'] * 1000:8.2f}",
+                f"{metrics['rel_mae_mu']:8.1f}",
+            ])
         elif table_type == "DipolePolarRMSE":
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['rmse_mu_per_atom'] * 1000:.2f}",
-                    f"{metrics['rel_rmse_mu']:.1f}",
-                    f"{metrics['rmse_polarizability_per_atom'] * 1000:.2f}",
-                ]
-            )
+            table.add_row([
+                name,
+                f"{metrics['rmse_mu_per_atom'] * 1000:.2f}",
+                f"{metrics['rel_rmse_mu']:.1f}",
+                f"{metrics['rmse_polarizability_per_atom'] * 1000:.2f}",
+            ])
         elif table_type == "EnergyDipoleRMSE":
-            table.add_row(
-                [
-                    name,
-                    f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
-                    f"{metrics['rmse_f'] * 1000:8.1f}",
-                    f"{metrics['rel_rmse_f']:8.1f}",
-                    f"{metrics['rmse_mu_per_atom'] * 1000:8.1f}",
-                    f"{metrics['rel_rmse_mu']:8.1f}",
-                ]
-            )
+            table.add_row([
+                name,
+                f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
+                f"{metrics['rmse_f'] * 1000:8.1f}",
+                f"{metrics['rel_rmse_f']:8.1f}",
+                f"{metrics['rmse_mu_per_atom'] * 1000:8.1f}",
+                f"{metrics['rel_rmse_mu']:8.1f}",
+            ])
     return table

@@ -85,6 +85,18 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         default=False,
     )
     parser.add_argument(
+        "--compute_uncertainty",
+        help="Use Negative Log Likelihood Loss instead of MSE",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--uncertainty_eps",
+        help="Cutoff for clamping variance",
+        type=float,
+        default=1e-6,
+    )
+    parser.add_argument(
         "--launcher",
         default="slurm",
         choices=["slurm", "torchrun", "mpi", "none"],
@@ -124,10 +136,16 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         choices=[
             "PerAtomRMSE",
             "TotalRMSE",
+            "PerAtomRMSEuncertainty",
+            "TotalRMSEuncertainty",
             "PerAtomRMSEstressvirials",
             "PerAtomMAEstressvirials",
+            "PerAtomRMSEstressvirialsuncertainty",
+            "PerAtomMAEstressvirialsuncertainty",
             "PerAtomMAE",
             "TotalMAE",
+            "PerAtomMAEuncertainty",
+            "TotalMAEuncertainty",
             "DipoleRMSE",
             "DipoleMAE",
             "DipolePolarRMSE",
@@ -796,6 +814,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
                         help="weight of forces loss",
                         type=float,
                         default=100.0)
+    parser.add_argument("--forces_uncertainty_weight",
+                        help="weight of uncertainty forces loss",
+                        type=float,
+                        default=100.0)
     parser.add_argument(
         "--swa_forces_weight",
         "--stage_two_forces_weight",
@@ -805,8 +827,21 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         default=100.0,
         dest="swa_forces_weight",
     )
+    parser.add_argument(
+        "--swa_forces_uncertainty_weight",
+        "--stage_two_forces_uncertainty_weight",
+        help=
+        "weight of uncertainty forces loss after starting Stage Two (previously called swa)",
+        type=float,
+        default=100.0,
+        dest="swa_forces_uncertainty_weight",
+    )
     parser.add_argument("--energy_weight",
                         help="weight of energy loss",
+                        type=float,
+                        default=1.0)
+    parser.add_argument("--energy_uncertainty_weight",
+                        help="weight of uncertainty energy loss",
                         type=float,
                         default=1.0)
     parser.add_argument(
@@ -818,8 +853,21 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         default=1000.0,
         dest="swa_energy_weight",
     )
+    parser.add_argument(
+        "--swa_energy_uncertainty_weight",
+        "--stage_two_energy_uncertainty_weight",
+        help=
+        "weight of uncertainty energy loss after starting Stage Two (previously called swa)",
+        type=float,
+        default=1000.0,
+        dest="swa_energy_uncertainty_weight",
+    )
     parser.add_argument("--virials_weight",
                         help="weight of virials loss",
+                        type=float,
+                        default=1.0)
+    parser.add_argument("--virials_uncertainty_weight",
+                        help="weight of uncertainty virials loss",
                         type=float,
                         default=1.0)
     parser.add_argument(
@@ -831,8 +879,21 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         default=10.0,
         dest="swa_virials_weight",
     )
+    parser.add_argument(
+        "--swa_virials_uncertainty_weight",
+        "--stage_two_virials_uncertainty_weight",
+        help=
+        "weight of uncertainty virials loss after starting Stage Two (previously called swa)",
+        type=float,
+        default=10.0,
+        dest="swa_virials_uncertainty_weight",
+    )
     parser.add_argument("--stress_weight",
                         help="weight of stress loss",
+                        type=float,
+                        default=1.0)
+    parser.add_argument("--stress_uncertainty_weight",
+                        help="weight of uncertainty stress loss",
                         type=float,
                         default=1.0)
     parser.add_argument(
@@ -843,6 +904,15 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=10.0,
         dest="swa_stress_weight",
+    )
+    parser.add_argument(
+        "--swa_stress_uncertainty_weight",
+        "--stage_two_stress_uncertainty_weight",
+        help=
+        "weight of stress uncertainty loss after starting Stage Two (previously called swa)",
+        type=float,
+        default=10.0,
+        dest="swa_stress_uncertainty_weight",
     )
     parser.add_argument("--dipole_weight",
                         help="weight of dipoles loss",
