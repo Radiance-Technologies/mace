@@ -33,9 +33,13 @@ from .loss import (
     WeightedEnergyForcesDipoleLoss,
     WeightedEnergyForcesL1L2Loss,
     WeightedEnergyForcesLoss,
+    WeightedEnergyForcesNLLLoss,
     WeightedEnergyForcesStressLoss,
+    WeightedEnergyForcesStressNLLLoss,
     WeightedEnergyForcesVirialsLoss,
+    WeightedEnergyForcesVirialsNLLLoss,
     WeightedForcesLoss,
+    WeightedForcesNLLLoss,
     WeightedHuberEnergyForcesStressLoss,
 )
 from .models import (
@@ -59,12 +63,18 @@ from .utils import (
 )
 
 interaction_classes: Dict[str, Type[InteractionBlock]] = {
-    "RealAgnosticResidualInteractionBlock": RealAgnosticResidualInteractionBlock,
-    "RealAgnosticAttResidualInteractionBlock": RealAgnosticAttResidualInteractionBlock,
-    "RealAgnosticInteractionBlock": RealAgnosticInteractionBlock,
-    "RealAgnosticDensityInteractionBlock": RealAgnosticDensityInteractionBlock,
-    "RealAgnosticDensityResidualInteractionBlock": RealAgnosticDensityResidualInteractionBlock,
-    "RealAgnosticResidualNonLinearInteractionBlock": RealAgnosticResidualNonLinearInteractionBlock,
+    "RealAgnosticResidualInteractionBlock":
+    RealAgnosticResidualInteractionBlock,
+    "RealAgnosticAttResidualInteractionBlock":
+    RealAgnosticAttResidualInteractionBlock,
+    "RealAgnosticInteractionBlock":
+    RealAgnosticInteractionBlock,
+    "RealAgnosticDensityInteractionBlock":
+    RealAgnosticDensityInteractionBlock,
+    "RealAgnosticDensityResidualInteractionBlock":
+    RealAgnosticDensityResidualInteractionBlock,
+    "RealAgnosticResidualNonLinearInteractionBlock":
+    RealAgnosticResidualNonLinearInteractionBlock,
 }
 
 readout_classes: Dict[str, Type[LinearReadoutBlock]] = {
@@ -113,9 +123,13 @@ __all__ = [
     "EnergyDipolesMACE",
     "PolarMACE",
     "WeightedEnergyForcesLoss",
+    "WeightedEnergyForcesNLLLoss",
     "WeightedForcesLoss",
+    "WeightedForcesNLLLoss",
     "WeightedEnergyForcesVirialsLoss",
+    "WeightedEnergyForcesVirialsNLLLoss",
     "WeightedEnergyForcesStressLoss",
+    "WeightedEnergyForcesStressNLLLoss",
     "DipoleSingleLoss",
     "WeightedEnergyForcesDipoleLoss",
     "WeightedHuberEnergyForcesStressLoss",
