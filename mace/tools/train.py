@@ -695,6 +695,9 @@ class MACELoss(Metric):
         self.add_state("E_computed",
                        default=torch.tensor(0.0),
                        dist_reduce_fx="sum")
+        self.add_state("energy_uncertainty_computed",
+                       default=torch.tensor(0.0),
+                       dist_reduce_fx="sum")
         self.add_state("delta_es", default=[], dist_reduce_fx="cat")
         self.add_state("delta_es_per_atom", default=[], dist_reduce_fx="cat")
         self.add_state("Fs_computed",
@@ -709,8 +712,14 @@ class MACELoss(Metric):
         self.add_state("stress_computed",
                        default=torch.tensor(0.0),
                        dist_reduce_fx="sum")
+        self.add_state("stress_uncertainty_computed",
+                       default=torch.tensor(0.0),
+                       dist_reduce_fx="sum")
         self.add_state("delta_stress", default=[], dist_reduce_fx="cat")
         self.add_state("virials_computed",
+                       default=torch.tensor(0.0),
+                       dist_reduce_fx="sum")
+        self.add_state("virials_uncertainty_computed",
                        default=torch.tensor(0.0),
                        dist_reduce_fx="sum")
         self.add_state("delta_virials", default=[], dist_reduce_fx="cat")
