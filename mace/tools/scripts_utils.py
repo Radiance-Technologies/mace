@@ -665,7 +665,7 @@ def get_loss_fn(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertinty_weight=args.forces_uncertainty_weight,
+                forces_uncertainty_weight=args.forces_uncertainty_weight,
                 eps=args.uncertainty_eps)
         else:
             loss_fn = modules.WeightedEnergyForcesLoss(
@@ -675,7 +675,7 @@ def get_loss_fn(
         if args.compute_uncertainty:
             loss_fn = modules.WeightedForcesNLLLoss(
                 forces_weight=args.forces_weight,
-                forces_uncertinty_weight=args.forces_uncertinty_weight,
+                forces_uncertainty_weight=args.forces_uncertainty_weight,
                 eps=args.uncertainty_eps)
         else:
             loss_fn = modules.WeightedForcesLoss(
@@ -687,7 +687,7 @@ def get_loss_fn(
                 forces_weight=args.forces_weight,
                 virials_weight=args.virials_weight,
                 energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertinty_weight=args.forces_uncertainty_weight,
+                forces_uncertainty_weight=args.forces_uncertainty_weight,
                 virials_uncertainty_weight=args.virials_uncertainty_weight,
                 eps=args.uncertainty_eps)
         else:
@@ -703,7 +703,7 @@ def get_loss_fn(
                 forces_weight=args.forces_weight,
                 stress_weight=args.stress_weight,
                 energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertinty_weight=args.forces_uncertainty_weight,
+                forces_uncertainty_weight=args.forces_uncertainty_weight,
                 stress_uncertainty_weight=args.stress_uncertainty_weight,
                 eps=args.uncertainty_eps)
         else:
