@@ -285,30 +285,32 @@ class MACELES(ScaleShiftMACE):
         forces_var_logits: Optional[torch.Tensor] = None
         stress_var_logits: Optional[torch.Tensor] = None
         virials_var_logits: Optional[torch.Tensor] = None
-        if self.compute_uncertainty:
-            forces_var_logits = self.forces_var_readout(node_feats_out)
 
-            node_energy_var = self.energy_var_readout(node_feats_out)
+        if self.compute_uncertainty:
+            node_feats = node_feats_out if not self.use_last_readout_only else node_feats_list[
+                -1]
+            unc_logits = self.uncertainty_readout(node_feats, node_heads)
+            forces_var_logits, energy_node_var, stress_node_var, virials_node_var = torch.chunk(
+                unc_logits, chunks=4, dim=-1)
+
             energy_var_logits = scatter_sum(
-                src=node_energy_var,
+                src=energy_node_var.squeeze(-1),
                 index=data["batch"],
                 dim=0,
                 dim_size=num_graphs,
             )
 
             if compute_stress:
-                node_stress_var = self.stress_var_readout(node_feats_out)
                 stress_var_logits = scatter_sum(
-                    src=node_stress_var,
+                    src=stress_node_var.squeeze(-1),
                     index=data["batch"],
                     dim=0,
                     dim_size=num_graphs,
                 )
 
             if compute_virials:
-                node_virials_var = self.virials_var_readout(node_feats_out)
                 virials_var_logits = scatter_sum(
-                    src=node_virials_var,
+                    src=virials_node_var.squeeze(-1),
                     index=data["batch"],
                     dim=0,
                     dim_size=num_graphs,
@@ -990,30 +992,32 @@ class PolarMACE(ScaleShiftMACE):
         forces_var_logits: Optional[torch.Tensor] = None
         stress_var_logits: Optional[torch.Tensor] = None
         virials_var_logits: Optional[torch.Tensor] = None
-        if self.compute_uncertainty:
-            forces_var_logits = self.forces_var_readout(node_feats_out)
 
-            node_energy_var = self.energy_var_readout(node_feats_out)
+        if self.compute_uncertainty:
+            node_feats = node_feats_out if not self.use_last_readout_only else node_feats_list[
+                -1]
+            unc_logits = self.uncertainty_readout(node_feats, node_heads)
+            forces_var_logits, energy_node_var, stress_node_var, virials_node_var = torch.chunk(
+                unc_logits, chunks=4, dim=-1)
+
             energy_var_logits = scatter_sum(
-                src=node_energy_var,
+                src=energy_node_var.squeeze(-1),
                 index=data["batch"],
                 dim=0,
                 dim_size=num_graphs,
             )
 
             if compute_stress:
-                node_stress_var = self.stress_var_readout(node_feats_out)
                 stress_var_logits = scatter_sum(
-                    src=node_stress_var,
+                    src=stress_node_var.squeeze(-1),
                     index=data["batch"],
                     dim=0,
                     dim_size=num_graphs,
                 )
 
             if compute_virials:
-                node_virials_var = self.virials_var_readout(node_feats_out)
                 virials_var_logits = scatter_sum(
-                    src=node_virials_var,
+                    src=virials_node_var.squeeze(-1),
                     index=data["batch"],
                     dim=0,
                     dim_size=num_graphs,
