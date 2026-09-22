@@ -334,6 +334,9 @@ def extract_config_mace_model(model: torch.nn.Module) -> Dict[str, Any]:
         shift.cpu().numpy(),
         "heads":
         heads,
+        "compute_uncertainty":
+        model.compute_uncertainty
+        if hasattr(model, "compute_uncertainty") else False,
     }
     if model.__class__.__name__ == "AtomicDielectricMACE":
         config["use_polarizability"] = model.use_polarizability
