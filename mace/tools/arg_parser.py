@@ -84,12 +84,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
     )
-    parser.add_argument(
-        "--compute_uncertainty",
-        help="Use Negative Log Likelihood Loss instead of MSE",
-        action="store_true",
-        default=False,
-    )
+    parser.add_argument("--compute_uncertainty",
+                        help="Use Negative Log Likelihood Loss instead of MSE",
+                        type=str2bool,
+                        default=False)
     parser.add_argument(
         "--uncertainty_eps",
         help="Cutoff for clamping variance",
