@@ -673,18 +673,20 @@ class ScaleShiftMACE(MACE):
             compute_hessian=compute_hessian,
             compute_edge_forces=compute_edge_forces or compute_atomic_stresses,
         )
+
         energy_var: Optional[torch.Tensor] = None
         forces_var: Optional[torch.Tensor] = None
         stress_var: Optional[torch.Tensor] = None
         virials_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
+            scale_sq = torch.atleast_1d(self.scale_shift.scale)**2
             node_energy_var_logits_raw = self.energy_var_readout(
                 node_feats_list[-1], node_heads)
             node_energy_var_logits = node_energy_var_logits_raw[
                 num_atoms_arange, node_heads]
             node_energy_var = torch.nn.functional.softplus(
                 node_energy_var_logits) + self.eps
-
+            node_energy_var *= scale_sq
             energy_var = scatter_sum(src=node_energy_var,
                                      index=data["batch"],
                                      dim=0,
@@ -696,6 +698,7 @@ class ScaleShiftMACE(MACE):
                                                       node_heads]
             forces_var = torch.nn.functional.softplus(
                 forces_var_logits) + self.eps
+            forces_var *= scale_sq
 
             if compute_virials or compute_stress:
                 node_virials_var_logits_raw = self.virial_var_readout(
@@ -705,7 +708,7 @@ class ScaleShiftMACE(MACE):
                     num_atoms_arange, node_heads]
                 node_virials_var = torch.nn.functional.softplus(
                     node_virials_var_logits) + self.eps
-
+                node_virials_var *= scale_sq
                 virials_var = scatter_sum(src=node_virials_var,
                                           index=data["batch"],
                                           dim=0,

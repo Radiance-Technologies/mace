@@ -102,7 +102,7 @@ def weighted_laplace_nll_energy(
         ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
     num_atoms = ref.ptr[1:] - ref.ptr[:-1]
     weights = ref.weight * ref.energy_weight
-    b_per_atom = pred["energy_var"] / num_atoms
+    b_per_atom = torch.sqrt(pred["forces_var"] / 2.0) / num_atoms
     mae = torch.abs((ref["energy"] - pred["energy"]) / num_atoms)
     nll = mae / b_per_atom + torch.log(b_per_atom)
     return reduce_loss(weights * mae, ddp), reduce_loss(weights * nll, ddp)
@@ -197,10 +197,11 @@ def laplace_nll_normed_forces(
         ref: Batch,
         pred: TensorDict,
         ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
+    b = torch.sqrt(pred["forces_var"] / 2.0)
     mae = torch.linalg.vector_norm(ref["forces"] - pred["forces"],
                                    ord=2,
                                    dim=-1)
-    nll = (mae / pred["forces_var"]) + torch.log(pred["forces_var"])
+    nll = (mae / b) + b
     return reduce_loss(mae, ddp), reduce_loss(nll, ddp)
 
 
@@ -360,7 +361,8 @@ def conditional_huber_nll_forces(
                                                ref.ptr[:-1]).unsqueeze(-1)
     ref_f = configs_f_weight * ref["forces"]
     pred_f = configs_f_weight * pred["forces"]
-    inv_std = 1.0 / pred["forces_var"]
+    std = torch.sqrt(pred["forces_var"])
+    inv_std = 1.0 / std
     factors = huber_delta * torch.tensor(
         [1.0, 0.7, 0.4, 0.1], device=ref_f.device, dtype=ref_f.dtype)
     norm_f = torch.norm(ref_f, dim=-1)
@@ -406,7 +408,7 @@ def conditional_huber_nll_forces(
                                              reduction="none",
                                              delta=factors[3],
                                              weight=inv_std[c4])
-    nll = she + torch.log(pred["forces_var"]) + log_z_delta
+    nll = she + torch.log(std) + log_z_delta
     return reduce_loss(he, ddp), reduce_loss(nll, ddp)
 
 
@@ -447,7 +449,7 @@ def huber_nll_energy(
     num_atoms = ref.ptr[1:] - ref.ptr[:-1]
     ref_e_per_atom = ref["energy"] / num_atoms
     pred_e_per_atom = pred["energy"] / num_atoms
-    std_per_atom = pred["energy_var"] / num_atoms
+    std_per_atom = torch.sqrt(pred["energy_var"]) / num_atoms
     inv_std_per_atom = 1.0 / std_per_atom
     he = torch.nn.functional.huber_loss(
         ref_e_per_atom,
@@ -501,7 +503,7 @@ def weighted_huber_nll_energy(
     num_atoms = ref.ptr[1:] - ref.ptr[:-1]
     ref_e_per_atom = ref.energy_weight * ref["energy"] / num_atoms
     pred_e_per_atom = ref.energy_weight * pred["energy"] / num_atoms
-    std_per_atom = pred["energy_var"] / num_atoms
+    std_per_atom = torch.sqrt(pred["energy_var"]) / num_atoms
     inv_std_per_atom = 1.0 / std_per_atom
     he = torch.nn.functional.huber_loss(
         ref_e_per_atom,
@@ -551,7 +553,8 @@ def huber_nll_forces(
     log_z_delta: torch.Tensor,
     ddp: Optional[bool] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    inv_std = 1.0 / pred["forces_var"]
+    std = torch.sqrt(pred["forces_var"])
+    inv_std = 1.0 / std
     he = torch.nn.functional.huber_loss(
         ref["forces"],
         pred["forces"],
@@ -564,7 +567,7 @@ def huber_nll_forces(
         reduction="none",
         delta=huber_delta,
         weight=inv_std,
-    ) + torch.log(pred["forces_var"]) + log_z_delta
+    ) + torch.log(std) + log_z_delta
     if ddp:
         he = reduce_loss(he, ddp)
         nll = reduce_loss(nll, ddp)
@@ -600,7 +603,8 @@ def huber_nll_stress(
     log_z_delta: torch.Tensor,
     ddp: Optional[bool] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    inv_std = 1.0 / pred["stress_var"]
+    std = torch.sqrt(pred["stress_var"])
+    inv_std = 1.0 / std
     raw_huber = torch.nn.functional.huber_loss(
         ref["stress"],
         pred["stress"],
@@ -613,7 +617,7 @@ def huber_nll_stress(
         reduction="none",
         delta=huber_delta,
         weight=inv_std,
-    ) + torch.log(pred["stress_var"]) + log_z_delta
+    ) + torch.log(std) + log_z_delta
     if ddp:
         raw_huber = reduce_loss(raw_huber, ddp)
         raw_nll = reduce_loss(raw_nll, ddp)
@@ -653,7 +657,8 @@ def weighted_huber_nll_stress(
     configs_stress_weight = ref.stress_weight.view(-1, 1, 1)
     ref_s = configs_stress_weight * ref["stress"]
     pred_s = configs_stress_weight * pred["stress"]
-    inv_std = 1.0 / pred["stress_var"]
+    std = torch.sqrt(pred["stress_var"])
+    inv_std = 1.0 / std
     he = torch.nn.functional.huber_loss(
         ref_s,
         pred_s,
@@ -666,7 +671,7 @@ def weighted_huber_nll_stress(
         reduction="none",
         delta=huber_delta,
         weight=inv_std,
-    ) + torch.log(pred["stress_var"]) + log_z_delta
+    ) + torch.log(std) + log_z_delta
     if ddp:
         he = reduce_loss(he, ddp)
         nll = reduce_loss(nll, ddp)

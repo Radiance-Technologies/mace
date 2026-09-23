@@ -1421,33 +1421,3 @@ class ScaleShiftBlock(torch.nn.Module):
             f"{x:.4f}" for x in self.shift
         ]) if self.shift.numel() > 1 else f"{self.shift.item():.4f}")
         return f"{self.__class__.__name__}(scale={formatted_scale}, shift={formatted_shift})"
-
-
-@compile_mode("script")
-class ScaleVarianceBlock(torch.nn.Module):
-
-    def __init__(self, scale: float):
-        super().__init__()
-        self.register_buffer(
-            "scale",
-            torch.tensor(scale, dtype=torch.get_default_dtype()),
-        )
-
-    def forward(self,
-                var_logits: torch.Tensor,
-                head: torch.Tensor,
-                eps: float = 1e-6) -> torch.Tensor:
-        # 1. Transform logits to raw variance
-        var = torch.nn.functional.softplus(var_logits) + eps
-
-        # 2. Scale variance by S^2 (ignoring shift)
-        scale_sq = torch.atleast_1d(self.scale)[head]**2
-        scaled_var = var * scale_sq
-
-        return scaled_var
-
-    def __repr__(self):
-        formatted_scale = (", ".join([
-            f"{x:.4f}" for x in self.scale
-        ]) if self.scale.numel() > 1 else f"{self.scale.item():.4f}")
-        return f"{self.__class__.__name__}(scale={formatted_scale})"
