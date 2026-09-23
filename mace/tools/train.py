@@ -673,9 +673,6 @@ def evaluate(
                 compute_virials=output_args["virials"],
                 compute_stress=output_args["stress"],
             )
-            logging.info(
-                f"Uncertainty? {getattr(model, 'compute_uncertainty', False)}")
-            logging.info(f"Output? {output}")
             avg_loss, aux = metrics(batch, output)
     avg_loss, aux = metrics.compute()
     aux["time"] = time.time() - start_time

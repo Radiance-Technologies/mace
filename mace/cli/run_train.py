@@ -808,11 +808,7 @@ def run(args) -> None:
     model, output_args = configure_model(args, train_loader, atomic_energies,
                                          model_foundation, heads, z_table,
                                          head_configs)
-    logging.info(f"Uncertainty? {args.compute_uncertainty}")
     model.to(device)
-    logging.info(
-        f"Uncertainty in Model? {getattr(model, 'compute_uncertainty', False)}"
-    )
 
     if args.lora:
         lora_rank = args.lora_rank
@@ -834,9 +830,6 @@ def run(args) -> None:
         logging.info(
             "Model with LoRA has %s trainable parameters.",
             tools.count_parameters(model),
-        )
-        logging.info(
-            f"Uncertainty at LoRA? {getattr(model, 'compute_uncertainty', False)}"
         )
 
     logging.info("===========OPTIMIZER INFORMATION===========")
@@ -867,9 +860,6 @@ def run(args) -> None:
             "PolarMACE",
         ]
         model = run_e3nn_to_cueq(deepcopy(model), device=device)
-        logging.info(
-            f"Uncertainty at CUEQ? {getattr(model, 'compute_uncertainty', False)}"
-        )
     if args.enable_oeq:
         logging.info("Converting model to OEQ for accelerated training")
         assert model.__class__.__name__ in [
@@ -879,9 +869,6 @@ def run(args) -> None:
             "PolarMACE",
         ]
         model = run_e3nn_to_oeq(deepcopy(model), device=device)
-        logging.info(
-            f"Uncertaint at OEQy? {getattr(model, 'compute_uncertainty', False)}"
-        )
 
     # Optimizer
     param_options = get_params_options(args, model)
@@ -900,9 +887,6 @@ def run(args) -> None:
     if args.device == "xpu":
         logging.info("Optimzing model and optimzier for XPU")
         model, optimizer = ipex.optimize(model, optimizer=optimizer)
-        logging.info(
-            f"Uncertainty at Optimier XPU? {getattr(model, 'compute_uncertainty', False)}"
-        )
     logger = tools.MetricsLogger(directory=args.results_dir,
                                  tag=tag + "_train")  # pylint: disable=E1123
 
@@ -1004,9 +988,6 @@ def run(args) -> None:
     if args.device == "xpu":
         try:
             model, optimizer = ipex.optimize(model, optimizer=optimizer)
-            logging.info(
-                f"Uncertainty at XPU? {getattr(model, 'compute_uncertainty', False)}"
-            )
         except ImportError as e:
             logging.error(
                 "Intel Extension for PyTorch not found, but XPU device was specified. "
