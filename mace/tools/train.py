@@ -879,10 +879,6 @@ class MACELoss(Metric):
         aux = defaultdict(NoneMultiply)
         aux["loss"] = to_numpy(self.total_loss / self.num_data).item()
 
-        eps = (self.loss_fn.eps.item() if hasattr(self.loss_fn, "eps")
-               and isinstance(self.loss_fn.eps, torch.Tensor) else getattr(
-                   self.loss_fn, "eps", 1e-6))
-
         if self.E_computed:
             delta_es = self.convert(self.delta_es)
             delta_es_per_atom = self.convert(self.delta_es_per_atom)
