@@ -415,22 +415,23 @@ class MACE(torch.nn.Module):
 
         for i, readout in enumerate(self.readouts):
             feat_idx = -1 if len(self.readouts) == 1 else i
-            out = readout(node_feats_concat[feat_idx],
-                          node_heads)[num_atoms_arange, node_heads]
+            out_raw = readout(node_feats_concat[feat_idx], node_heads)
 
             if self.compute_uncertainty:
-                node_es, node_var_logits = torch.chunk(out, chunks=2, dim=-1)
+                out_reshaped = out_raw.view(-1, len(self.heads), 2)
+                out_head = out_reshaped[num_atoms_arange, node_heads]
+                node_es = out_head[:, 0]
+                node_var_logits = out_head[:, 1]
                 var_logits_list.append(node_var_logits)
             else:
-                node_es = out
+                node_es = out_raw[num_atoms_arange, node_heads]
 
-            node_es_head = node_es[torch.arange(node_es.size(0)), node_heads]
-            energy = scatter_sum(node_es_head,
+            energy = scatter_sum(node_es,
                                  data["batch"],
                                  dim=0,
                                  dim_size=num_graphs)
             energies.append(energy)
-            node_energies_list.append(node_es_head)
+            node_energies_list.append(node_es)
 
         contributions = torch.stack(energies, dim=-1)
         total_energy = torch.sum(contributions, dim=-1)
@@ -616,12 +617,7 @@ class ScaleShiftMACE(MACE):
                 )
                 e0 += embedding_energy
 
-        # Interactions
-        if pair_node_energy.ndim > 1:
-            pair_node_e_head = pair_node_energy[num_atoms_arange, node_heads]
-        else:
-            pair_node_e_head = pair_node_energy
-        node_es_list = [pair_node_e_head]
+        node_es_list = [pair_node_energy]
         var_logits_list: List[torch.Tensor] = []
         node_feats_list: List[torch.Tensor] = []
 
@@ -648,16 +644,19 @@ class ScaleShiftMACE(MACE):
                                  node_attrs=node_attrs_slice)
             node_feats_list.append(node_feats)
 
-        for i, readout in enumerate(self.readouts):
-            feat_idx = -1 if len(self.readouts) == 1 else i
-            out = readout(node_feats_list[feat_idx],
-                          node_heads)[num_atoms_arange, node_heads]
+        for feat_idx, readout in enumerate(self.readouts):
+            out_raw = readout(node_feats_list[feat_idx], node_heads)
 
             if self.compute_uncertainty:
-                node_e, node_var = torch.chunk(out, chunks=2, dim=-1)
-                node_es_list.append(node_e.squeeze(-1))
-                var_logits_list.append(node_var.squeeze(-1))
+                out_reshaped = out_raw.view(-1, len(self.heads), 2)
+                out_head = out_reshaped[num_atoms_arange, node_heads]
+                node_e = out_head[:, 0]
+                node_var = out_head[:, 1]
+
+                node_es_list.append(node_e)
+                var_logits_list.append(node_var)
             else:
+                out = out_raw[num_atoms_arange, node_heads]
                 node_es_list.append(out)
 
         node_feats_out = torch.cat(node_feats_list, dim=-1)
