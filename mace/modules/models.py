@@ -445,6 +445,10 @@ class MACE(torch.nn.Module):
             compute_hessian=compute_hessian,
             compute_edge_forces=compute_edge_forces,
         )
+        energy_var: Optional[torch.Tensor] = None
+        forces_var: Optional[torch.Tensor] = None
+        stress_var: Optional[torch.Tensor] = None
+        virials_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
             node_energy_var_logits_raw = self.energy_var_readout(
                 node_feats_out, node_heads)
@@ -669,7 +673,10 @@ class ScaleShiftMACE(MACE):
             compute_hessian=compute_hessian,
             compute_edge_forces=compute_edge_forces or compute_atomic_stresses,
         )
-
+        energy_var: Optional[torch.Tensor] = None
+        forces_var: Optional[torch.Tensor] = None
+        stress_var: Optional[torch.Tensor] = None
+        virials_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
             node_energy_var_logits_raw = self.energy_var_readout(
                 node_feats_out, node_heads)
