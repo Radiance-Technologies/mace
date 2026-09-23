@@ -758,14 +758,14 @@ class MACELoss(Metric):
                                                      batch.weight,
                                                      batch.energy_weight)
 
-        if output.get("energy_var_logits") is not None:
-            logits = output["energy_var_logits"].detach()
-            self.energy_var_logits.append(logits)
-            self.energy_var_logits_per_atom.append(
-                logits / (batch.ptr[1:] - batch.ptr[:-1]))
+        if output.get("energy_var") is not None:
+            logits = output["energy_var"].detach()
+            self.energy_var.append(logits)
+            self.energy_var_per_atom.append(logits /
+                                            (batch.ptr[1:] - batch.ptr[:-1]))
             self.energy_uncertainty_computed += filter_nonzero_weight(
                 batch,
-                self.energy_var_logits,
+                self.energy_var,
                 batch.weight,
                 batch.energy_weight,
             )
@@ -781,11 +781,11 @@ class MACELoss(Metric):
                 spread_atoms=True,
             )
 
-        if output.get("forces_var_logits") is not None:
-            self.forces_var_logits.append(output["forces_var_logits"].detach())
+        if output.get("forces_var") is not None:
+            self.forces_var.append(output["forces_var"].detach())
             self.forces_uncertainty_computed += filter_nonzero_weight(
                 batch,
-                self.forces_var_logits,
+                self.forces_var,
                 batch.weight,
                 batch.forces_weight,
                 spread_atoms=True,
@@ -796,11 +796,11 @@ class MACELoss(Metric):
             self.stress_computed += filter_nonzero_weight(
                 batch, self.delta_stress, batch.weight, batch.stress_weight)
 
-        if output.get("stress_var_logits") is not None:
-            self.stress_var_logits.append(output["stress_var_logits"].detach())
+        if output.get("stress_var") is not None:
+            self.stress_var.append(output["stress_var"].detach())
             self.stress_uncertainty_computed += filter_nonzero_weight(
                 batch,
-                self.stress_var_logits,
+                self.stress_var,
                 batch.weight,
                 batch.stress_weight,
             )
@@ -813,15 +813,15 @@ class MACELoss(Metric):
             self.virials_computed += filter_nonzero_weight(
                 batch, self.delta_virials, batch.weight, batch.virials_weight)
 
-        if output.get("virials_var_logits") is not None:
-            logits = output["virials_var_logits"].detach()
-            self.virials_var_logits.append(logits)
-            self.virials_var_logits_per_atom.append(
+        if output.get("virials_var") is not None:
+            logits = output["virials_var"].detach()
+            self.virials_var.append(logits)
+            self.virials_var_per_atom.append(
                 logits / (batch.ptr[1:] - batch.ptr[:-1]).view(-1, 1, 1))
 
             self.virials_uncertainty_computed += filter_nonzero_weight(
                 batch,
-                self.virials_var_logits,
+                self.virials_var,
                 batch.weight,
                 batch.virials_weight,
             )
@@ -893,12 +893,12 @@ class MACELoss(Metric):
             aux["q95_e"] = compute_q95(delta_es)
 
         if self.energy_uncertainty_computed:
-            logits = self.convert(self.energy_var_logits)
-            var = np.log1p(np.exp(logits)) + eps
-            std = np.sqrt(var)
-            logits_per_atom = self.convert(self.energy_var_logits_per_atom)
-            var_per_atom = np.log1p(np.exp(logits_per_atom)) + eps
-            std_per_atom = np.sqrt(var_per_atom)
+            var = self.convert(self.energy_var)
+            std = np.sqrt(energy_var)
+            aux["mean_energy_var"] = float(np.mean(var))
+            aux["mean_energy_std"] = float(np.mean(std))
+            var_per_atom = self.convert(self.energy_var_per_atom)
+            std_per_atom = np.sqrt(energy_var_per_atom)
             aux["mean_energy_var_per_atom"] = float(np.mean(var_per_atom))
             aux["mean_energy_std_per_atom"] = float(np.mean(std_per_atom))
 
@@ -912,8 +912,7 @@ class MACELoss(Metric):
             aux["q95_f"] = compute_q95(delta_fs)
 
         if self.forces_uncertainty_computed:
-            logits = self.convert(self.forces_var_logits)
-            var = np.log1p(np.exp(logits)) + eps
+            var = self.convert(self.forces_var)
             std = np.sqrt(var)
             aux["mean_force_var"] = float(np.mean(var))
             aux["mean_force_std"] = float(np.mean(std))
@@ -925,8 +924,7 @@ class MACELoss(Metric):
             aux["q95_stress"] = compute_q95(delta_stress)
 
         if self.stress_uncertainty_computed:
-            logits = self.convert(self.stress_var_logits)
-            var = np.log1p(np.exp(logits)) + eps
+            var = self.convert(self.stress_var)
             std = np.sqrt(var)
             aux["mean_stress_var"] = float(np.mean(var))
             aux["mean_stress_std"] = float(np.mean(std))
@@ -941,13 +939,11 @@ class MACELoss(Metric):
             aux["q95_virials"] = compute_q95(delta_virials)
 
         if self.virials_uncertainty_computed:
-            logits = self.convert(self.virials_var_logits)
-            var = np.log1p(np.exp(logits)) + eps
+            var = self.convert(self.virials_var)
             std = np.sqrt(var)
             aux["mean_virials_var"] = float(np.mean(var))
             aux["mean_virials_std"] = float(np.mean(std))
-            logits_per_atom = self.convert(self.virials_var_logits_per_atom)
-            var_per_atom = np.log1p(np.exp(logits_per_atom)) + eps
+            var_per_atom = self.convert(self.virials_var_per_atom)
             std_per_atom = np.sqrt(var_per_atom)
             aux["mean_virials_var_per_atom"] = float(np.mean(var_per_atom))
             aux["mean_virials_std_per_atom"] = float(np.mean(std_per_atom))
