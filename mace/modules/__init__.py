@@ -23,6 +23,7 @@ from .blocks import (
     RealAgnosticResidualInteractionBlock,
     RealAgnosticResidualNonLinearInteractionBlock,
     ScaleShiftBlock,
+    ScaleVarianceBlock,
 )
 from .extensions import PolarMACE
 from .gate import GatedEquivariantBlock
@@ -107,6 +108,7 @@ __all__ = [
     "LinearReadoutBlock",
     "EquivariantProductBasisBlock",
     "ScaleShiftBlock",
+    "ScaleVarianceBlock",
     "LinearDipoleReadoutBlock",
     "LinearDipolePolarReadoutBlock",
     "NonLinearDipoleReadoutBlock",

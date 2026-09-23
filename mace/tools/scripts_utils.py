@@ -337,6 +337,8 @@ def extract_config_mace_model(model: torch.nn.Module) -> Dict[str, Any]:
         "compute_uncertainty":
         model.compute_uncertainty
         if hasattr(model, "compute_uncertainty") else False,
+        "eps":
+        model.eps if hasattr(model, "eps") else 1e-6,
     }
     if model.__class__.__name__ == "AtomicDielectricMACE":
         config["use_polarizability"] = model.use_polarizability
@@ -668,8 +670,7 @@ def get_loss_fn(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
-                eps=args.uncertainty_eps)
+                forces_uncertainty_weight=args.forces_uncertainty_weight)
         else:
             loss_fn = modules.WeightedEnergyForcesLoss(
                 energy_weight=args.energy_weight,
@@ -678,8 +679,7 @@ def get_loss_fn(
         if args.compute_uncertainty:
             loss_fn = modules.WeightedForcesNLLLoss(
                 forces_weight=args.forces_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
-                eps=args.uncertainty_eps)
+                forces_uncertainty_weight=args.forces_uncertainty_weight)
         else:
             loss_fn = modules.WeightedForcesLoss(
                 forces_weight=args.forces_weight)
@@ -691,8 +691,7 @@ def get_loss_fn(
                 virials_weight=args.virials_weight,
                 energy_uncertainty_weight=args.energy_uncertainty_weight,
                 forces_uncertainty_weight=args.forces_uncertainty_weight,
-                virials_uncertainty_weight=args.virials_uncertainty_weight,
-                eps=args.uncertainty_eps)
+                virials_uncertainty_weight=args.virials_uncertainty_weight)
         else:
             loss_fn = modules.WeightedEnergyForcesVirialsLoss(
                 energy_weight=args.energy_weight,
@@ -707,8 +706,7 @@ def get_loss_fn(
                 stress_weight=args.stress_weight,
                 energy_uncertainty_weight=args.energy_uncertainty_weight,
                 forces_uncertainty_weight=args.forces_uncertainty_weight,
-                stress_uncertainty_weight=args.stress_uncertainty_weight,
-                eps=args.uncertainty_eps)
+                stress_uncertainty_weight=args.stress_uncertainty_weight)
         else:
             loss_fn = modules.WeightedEnergyForcesStressLoss(
                 energy_weight=args.energy_weight,
@@ -783,8 +781,7 @@ def get_swa(
                 virials_weight=args.swa_virials_weight,
                 energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
                 forces_uncertainty_weight=args.swa_forces_uncertainty_weight,
-                virials_uncertainty_weight=args.swa_virials_uncertainty_weight,
-                eps=args.uncertainty_eps)
+                virials_uncertainty_weight=args.swa_virials_uncertainty_weight)
             logging.info(
                 f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight},  virials weight: {args.swa_virials_weight}, energy uncertainty weight : {args.swa_energy_uncertainty_weight}, forces uncertainty weight : {args.swa_forces_uncertainty_weight},  virials uncertainty weight: {args.swa_virials_uncertainty_weight} and learning rate : {args.swa_lr}"
             )
@@ -805,8 +802,7 @@ def get_swa(
                 stress_weight=args.swa_stress_weight,
                 energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
                 forces_uncertainty_weight=args.swa_forces_uncertainty_weight,
-                stress_uncertainty_weight=args.swa_stress_uncertainty_weight,
-                eps=args.uncertainty_eps)
+                stress_uncertainty_weight=args.swa_stress_uncertainty_weight)
             logging.info(
                 f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, stress weight : {args.swa_stress_weight}, energy uncertainty weight : {args.swa_energy_uncertainty_weight}, forces uncertainty weight : {args.swa_forces_uncertainty_weight},  stress uncertainty weight: {args.swa_stress_uncertainty_weight} and learning rate : {args.swa_lr}"
             )
@@ -851,8 +847,7 @@ def get_swa(
             energy_weight=args.swa_energy_weight,
             forces_weight=args.swa_forces_weight,
             energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
-            forces_uncertainty_weight=args.swa_forces_uncertainty_weight,
-            eps=args.uncertainty_eps)
+            forces_uncertainty_weight=args.swa_forces_uncertainty_weight)
         logging.info(
             f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, with energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, energy uncertainty weight : {args.swa_energy_uncertainty_weight}, forces uncertainty weight : {args.swa_forces_uncertainty_weight} and learning rate : {args.swa_lr}"
         )

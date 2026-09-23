@@ -275,6 +275,7 @@ def _build_model(args, model_config, model_config_foundation, heads):  # pylint:
             use_last_readout_only=args.use_last_readout_only,
             use_agnostic_product=args.use_agnostic_product,
             compute_uncertainty=args.compute_uncertainty,
+            eps=args.uncertainty_eps,
         )
     if args.model == "ScaleShiftMACE":
         return modules.ScaleShiftMACE(
@@ -296,6 +297,7 @@ def _build_model(args, model_config, model_config_foundation, heads):  # pylint:
             use_last_readout_only=args.use_last_readout_only,
             use_agnostic_product=args.use_agnostic_product,
             compute_uncertainty=args.compute_uncertainty,
+            eps=args.uncertainty_eps,
         )
     if args.model == "PolarMACE" and model_config_foundation is not None:
         return modules.PolarMACE(**model_config_foundation)
@@ -345,6 +347,7 @@ def _build_model(args, model_config, model_config_foundation, heads):  # pylint:
             fixedpoint_update_config=fixedpoint_update_config,
             field_readout_config=field_readout_config,
             compute_uncertainty=args.compute_uncertainty,
+            eps=args.uncertainty_eps,
         )
     if args.model == "FoundationMACE":
         return modules.ScaleShiftMACE(**model_config_foundation)
@@ -429,5 +432,6 @@ def _build_model(args, model_config, model_config_foundation, heads):  # pylint:
             use_last_readout_only=args.use_last_readout_only,
             use_agnostic_product=args.use_agnostic_product,
             compute_uncertainty=args.compute_uncertainty,
+            eps=args.uncertainty_eps,
         )
     raise RuntimeError(f"Unknown model: '{args.model}'")
