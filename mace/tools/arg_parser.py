@@ -916,6 +916,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
                         help="weight of dipoles loss",
                         type=float,
                         default=1.0)
+    parser.add_argument("--dipole_uncertainty_weight",
+                        help="weight of dipoles uncertainty loss",
+                        type=float,
+                        default=1.0)
     parser.add_argument(
         "--swa_dipole_weight",
         "--stage_two_dipole_weight",
@@ -924,6 +928,15 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=1.0,
         dest="swa_dipole_weight",
+    )
+    parser.add_argument(
+        "--swa_dipole_uncertainty_weight",
+        "--stage_two_dipole_uncertainty_weight",
+        help=
+        "weight of dipoles uncertainty after starting Stage Two (previously called swa)",
+        type=float,
+        default=1.0,
+        dest="swa_dipole_uncertainty_weight",
     )
     parser.add_argument(
         "--swa_polarizability_weight",
@@ -935,8 +948,23 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         dest="swa_polarizability_weight",
     )
     parser.add_argument(
+        "--swa_polarizability_uncertainty_weight",
+        "--stage_two_polarizability_uncertainty_weight",
+        help=
+        "weight of polarizability uncertainty after starting Stage Two (previously called swa)",
+        type=float,
+        default=1.0,
+        dest="swa_polarizability_uncertainty_weight",
+    )
+    parser.add_argument(
         "--polarizability_weight",
         help="weight of polarizability loss",
+        type=float,
+        default=1.0,
+    )
+    parser.add_argument(
+        "--polarizability_uncertainty_weight",
+        help="weight of polarizability uncertainty loss",
         type=float,
         default=1.0,
     )
