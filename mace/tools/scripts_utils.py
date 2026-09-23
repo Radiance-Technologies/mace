@@ -669,8 +669,6 @@ def get_loss_fn(
             loss_fn = modules.WeightedEnergyForcesGaussianNLLLoss(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
-                energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
             )
         else:
             loss_fn = modules.WeightedEnergyForcesLoss(
@@ -680,9 +678,7 @@ def get_loss_fn(
     elif args.loss == "forces_only":
         if args.compute_uncertainty:
             loss_fn = modules.WeightedForcesGaussianNLLLoss(
-                forces_weight=args.forces_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
-            )
+                forces_weight=args.forces_weight, )
         else:
             loss_fn = modules.WeightedForcesLoss(
                 forces_weight=args.forces_weight, )
@@ -692,9 +688,6 @@ def get_loss_fn(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 virials_weight=args.virials_weight,
-                energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
-                virials_uncertainty_weight=args.virials_uncertainty_weight,
             )
         else:
             loss_fn = modules.WeightedEnergyForcesVirialsLoss(
@@ -708,9 +701,6 @@ def get_loss_fn(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 stress_weight=args.stress_weight,
-                energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
-                stress_uncertainty_weight=args.stress_uncertainty_weight,
             )
         else:
             loss_fn = modules.WeightedEnergyForcesStressLoss(
@@ -724,9 +714,6 @@ def get_loss_fn(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 stress_weight=args.stress_weight,
-                energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
-                stress_uncertainty_weight=args.stress_uncertainty_weight,
                 huber_delta=args.huber_delta,
             )
         else:
@@ -742,9 +729,6 @@ def get_loss_fn(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 stress_weight=args.stress_weight,
-                energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
-                stress_uncertainty_weight=args.stress_uncertainty_weight,
                 huber_delta=args.huber_delta,
             )
         else:
@@ -759,8 +743,6 @@ def get_loss_fn(
             loss_fn = modules.WeightedEnergyForcesL1L2LaplaceNLLLoss(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
-                energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
             )
         else:
             loss_fn = modules.WeightedEnergyForcesL1L2Loss(
@@ -772,9 +754,7 @@ def get_loss_fn(
                 ), "dipole loss can only be used with AtomicDipolesMACE model"
         if args.compute_uncertainty:
             loss_fn = modules.DipoleSingleGaussianNLLLoss(
-                dipole_weight=args.dipole_weight,
-                dipole_uncertainty_weight=args.dipole_uncertainty_weight,
-            )
+                dipole_weight=args.dipole_weight, )
         else:
             loss_fn = modules.DipoleSingleLoss(
                 dipole_weight=args.dipole_weight, )
@@ -783,9 +763,6 @@ def get_loss_fn(
             loss_fn = modules.DipolePolarGaussianNLLLoss(
                 dipole_weight=args.dipole_weight,
                 polarizability_weight=args.polarizability_weight,
-                dipole_uncertainty_weight=args.dipole_uncertainty_weight,
-                polarizability_uncertainty_weight=args.
-                polarizability_uncertainty_weight,
             )
         else:
             loss_fn = modules.DipolePolarLoss(
@@ -799,9 +776,6 @@ def get_loss_fn(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 dipole_weight=args.dipole_weight,
-                energy_uncertainty_weight=args.energy_uncertainty_weight,
-                forces_uncertainty_weight=args.forces_uncertainty_weight,
-                dipole_uncertainty_weight=args.dipole_uncertainty_weight,
             )
         else:
             loss_fn = modules.WeightedEnergyForcesDipoleLoss(
@@ -814,8 +788,6 @@ def get_loss_fn(
             loss_fn = modules.WeightedEnergyForcesGaussianNLLLoss(
                 energy_weight=1.0,
                 forces_weight=1.0,
-                energy_uncertainty_weight=1.0,
-                forces_uncertainty_weight=1.0,
             )
         else:
             loss_fn = modules.WeightedEnergyForcesLoss(
@@ -850,11 +822,9 @@ def get_swa(
                 energy_weight=args.swa_energy_weight,
                 forces_weight=args.swa_forces_weight,
                 virials_weight=args.swa_virials_weight,
-                energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
-                forces_uncertainty_weight=args.swa_forces_uncertainty_weight,
-                virials_uncertainty_weight=args.swa_virials_uncertainty_weight)
+            )
             logging.info(
-                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight},  virials weight: {args.swa_virials_weight}, energy uncertainty weight : {args.swa_energy_uncertainty_weight}, forces uncertainty weight : {args.swa_forces_uncertainty_weight},  virials uncertainty weight: {args.swa_virials_uncertainty_weight} and learning rate : {args.swa_lr}"
+                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight},  virials weight: {args.swa_virials_weight} and learning rate : {args.swa_lr}"
             )
         else:
             loss_fn_energy = modules.WeightedEnergyForcesVirialsLoss(
@@ -871,11 +841,9 @@ def get_swa(
                 energy_weight=args.swa_energy_weight,
                 forces_weight=args.swa_forces_weight,
                 stress_weight=args.swa_stress_weight,
-                energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
-                forces_uncertainty_weight=args.swa_forces_uncertainty_weight,
-                stress_uncertainty_weight=args.swa_stress_uncertainty_weight)
+            )
             logging.info(
-                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, stress weight : {args.swa_stress_weight}, energy uncertainty weight : {args.swa_energy_uncertainty_weight}, forces uncertainty weight : {args.swa_forces_uncertainty_weight},  stress uncertainty weight: {args.swa_stress_uncertainty_weight} and learning rate : {args.swa_lr}"
+                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, stress weight : {args.swa_stress_weight} and learning rate : {args.swa_lr}"
             )
         else:
             loss_fn_energy = modules.WeightedEnergyForcesStressLoss(
@@ -891,12 +859,9 @@ def get_swa(
             loss_fn_energy = modules.DipolePolarGaussianNLLLoss(
                 dipole_weight=args.swa_dipole_weight,
                 polarizability_weight=args.swa_polarizability_weight,
-                dipole_uncertainty_weight=args.swa_dipole_uncertainty_weight,
-                polarizability_uncertainty_weight=args.
-                swa_polarizability_uncertainty_weight,
             )
             logging.info(
-                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, dipole weight : {args.swa_dipole_weight}, polarizability weight : {args.swa_polarizability_weight}, dipole uncertainty weight : {args.swa_dipole_uncertainty_weight}, polarizability uncertainty weight : {args.swa_polarizability_uncertainty_weight} and learning rate : {args.swa_lr}"
+                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, dipole weight : {args.swa_dipole_weight}, polarizability weight : {args.swa_polarizability_weight} and learning rate : {args.swa_lr}"
             )
         else:
             loss_fn_energy = modules.DipolePolarLoss(
@@ -912,12 +877,9 @@ def get_swa(
                 energy_weight=args.swa_energy_weight,
                 forces_weight=args.swa_forces_weight,
                 dipole_weight=args.swa_dipole_weight,
-                energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
-                forces_uncertainty_weight=args.swa_forces_uncertainty_weight,
-                dipole_uncertainty_weight=args.swa_dipole_uncertainty_weight,
             )
             logging.info(
-                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, dipole weight : {args.swa_dipole_weight}, energy uncertainty weight : {args.swa_energy_uncertainty_weight}, forces uncertainty weight : {args.swa_forces_uncertainty_weight}, dipole uncertainty weight : {args.swa_dipole_uncertainty_weight} and learning rate : {args.swa_lr}"
+                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, dipole weight : {args.swa_dipole_weight} and learning rate : {args.swa_lr}"
             )
         else:
             loss_fn_energy = modules.WeightedEnergyForcesDipoleLoss(
@@ -934,13 +896,10 @@ def get_swa(
                 energy_weight=args.swa_energy_weight,
                 forces_weight=args.swa_forces_weight,
                 stress_weight=args.swa_stress_weight,
-                energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
-                forces_uncertainty_weight=args.swa_forces_uncertainty_weight,
-                stress_uncertainty_weight=args.swa_stress_uncertainty_weight,
                 huber_delta=args.huber_delta,
             )
             logging.info(
-                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, stress weight : {args.swa_stress_weight}, energy uncertainty weight : {args.swa_energy_uncertainty_weight}, forces uncertainty weight : {args.swa_forces_uncertainty_weight}, stress uncertainty weight : {args.swa_stress_uncertainty_weight} and learning rate : {args.swa_lr}"
+                f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, stress weight : {args.swa_stress_weight} and learning rate : {args.swa_lr}"
             )
         else:
             loss_fn_energy = modules.UniversalLoss(
@@ -956,10 +915,9 @@ def get_swa(
         loss_fn_energy = modules.WeightedEnergyForcesGaussianNLLLoss(
             energy_weight=args.swa_energy_weight,
             forces_weight=args.swa_forces_weight,
-            energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
-            forces_uncertainty_weight=args.swa_forces_uncertainty_weight)
+        )
         logging.info(
-            f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, energy uncertainty weight : {args.swa_energy_uncertainty_weight}, forces uncertainty weight : {args.swa_forces_uncertainty_weight} and learning rate : {args.swa_lr}"
+            f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, and learning rate : {args.swa_lr}"
         )
     else:
         loss_fn_energy = modules.WeightedEnergyForcesLoss(

@@ -56,35 +56,31 @@ def mean_squared_error_energy(ref: Batch,
     return reduce_loss(mse, ddp)
 
 
-def gaussian_nll_energy(
-        ref: Batch,
-        pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
+def gaussian_nll_energy(ref: Batch,
+                        pred: TensorDict,
+                        ddp: Optional[bool] = None) -> torch.Tensor:
     mse = torch.square(ref["energy"] - pred["energy"])
     nll = 0.5 * (mse / pred["energy_var"] + torch.log(pred["energy_var"]))
-    return reduce_loss(mse, ddp), reduce_loss(nll, ddp)
+    return reduce_loss(nll, ddp)
 
 
 def weighted_mean_squared_error_energy(
         ref: Batch,
         pred: TensorDict,
         ddp: Optional[bool] = None) -> torch.Tensor:
-    # Calculate per-graph number of atoms.
-    num_atoms = ref.ptr[1:] - ref.ptr[:-1]  # shape: [n_graphs]
+    num_atoms = ref.ptr[1:] - ref.ptr[:-1]
     mse = torch.square((ref["energy"] - pred["energy"]) / num_atoms)
     return reduce_loss(ref.weight * ref.energy_weight * mse, ddp)
 
 
-def weighted_gaussian_nll_energy(
-        ref: Batch,
-        pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
-    num_atoms = ref.ptr[1:] - ref.ptr[:-1]  # shape: [n_graphs]
-    weights = ref.weight * ref.energy_weight
+def weighted_gaussian_nll_energy(ref: Batch,
+                                 pred: TensorDict,
+                                 ddp: Optional[bool] = None) -> torch.Tensor:
+    num_atoms = ref.ptr[1:] - ref.ptr[:-1]
     var_per_atom = pred["energy_var"] / (num_atoms**2)
     mse = torch.square((ref["energy"] - pred["energy"]) / num_atoms)
     nll = 0.5 * (mse / var_per_atom + torch.log(var_per_atom))
-    return reduce_loss(weights * mse, ddp), reduce_loss(weights * nll, ddp)
+    return reduce_loss(ref.weight * ref.energy_weight * nll, ddp)
 
 
 def weighted_mean_absolute_error_energy(
@@ -96,16 +92,14 @@ def weighted_mean_absolute_error_energy(
     return reduce_loss(ref.weight * ref.energy_weight * mae, ddp)
 
 
-def weighted_laplace_nll_energy(
-        ref: Batch,
-        pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
+def weighted_laplace_nll_energy(ref: Batch,
+                                pred: TensorDict,
+                                ddp: Optional[bool] = None) -> torch.Tensor:
     num_atoms = ref.ptr[1:] - ref.ptr[:-1]
-    weights = ref.weight * ref.energy_weight
     b_per_atom = torch.sqrt(pred["forces_var"] / 2.0) / num_atoms
     mae = torch.abs((ref["energy"] - pred["energy"]) / num_atoms)
     nll = mae / b_per_atom + torch.log(b_per_atom)
-    return reduce_loss(weights * mae, ddp), reduce_loss(weights * nll, ddp)
+    return reduce_loss(ref.weight * ref.energy_weight * nll, ddp)
 
 
 # ------------------------------------------------------------------------------
@@ -121,14 +115,13 @@ def weighted_mean_squared_stress(ref: Batch,
     return reduce_loss(weights * mse, ddp)
 
 
-def weighted_gaussian_nll_stress(
-        ref: Batch,
-        pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
+def weighted_gaussian_nll_stress(ref: Batch,
+                                 pred: TensorDict,
+                                 ddp: Optional[bool] = None) -> torch.Tensor:
     weights = ref.weight.view(-1, 1, 1) * ref.stress_weight.view(-1, 1, 1)
     mse = torch.square(ref["stress"] - pred["stress"])
     nll = 0.5 * (mse / pred["stress_var"] + torch.log(pred["stress_var"]))
-    return reduce_loss(weights * mse, ddp), reduce_loss(weights * nll, ddp)
+    return reduce_loss(weights * nll, ddp)
 
 
 def weighted_mean_squared_virials(ref: Batch,
@@ -140,16 +133,15 @@ def weighted_mean_squared_virials(ref: Batch,
     return reduce_loss(weights * mse, ddp)
 
 
-def weighted_gaussian_nll_virials(
-        ref: Batch,
-        pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
+def weighted_gaussian_nll_virials(ref: Batch,
+                                  pred: TensorDict,
+                                  ddp: Optional[bool] = None) -> torch.Tensor:
     num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).view(-1, 1, 1)
     weights = ref.weight.view(-1, 1, 1) * ref.virials_weight.view(-1, 1, 1)
     var_per_atom = pred["virials_var"] / (num_atoms**2)
     mse = torch.square((ref["virials"] - pred["virials"]) / num_atoms)
     nll = 0.5 * (mse / var_per_atom + torch.log(var_per_atom))
-    return reduce_loss(weights * mse, ddp), reduce_loss(weights * nll, ddp)
+    return reduce_loss(weights * nll, ddp)
 
 
 # ------------------------------------------------------------------------------
@@ -160,7 +152,6 @@ def weighted_gaussian_nll_virials(
 def mean_squared_error_forces(ref: Batch,
                               pred: TensorDict,
                               ddp: Optional[bool] = None) -> torch.Tensor:
-    # Repeat per-graph weights to per-atom level.
     configs_weight = torch.repeat_interleave(ref.weight, ref.ptr[1:] -
                                              ref.ptr[:-1]).unsqueeze(-1)
     configs_forces_weight = torch.repeat_interleave(
@@ -169,19 +160,16 @@ def mean_squared_error_forces(ref: Batch,
     return reduce_loss(configs_weight * configs_forces_weight * mse, ddp)
 
 
-def gaussian_nll_forces(
-        ref: Batch,
-        pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
-    # Repeat per-graph weights to per-atom level
+def gaussian_nll_forces(ref: Batch,
+                        pred: TensorDict,
+                        ddp: Optional[bool] = None) -> torch.Tensor:
     configs_weight = torch.repeat_interleave(ref.weight, ref.ptr[1:] -
                                              ref.ptr[:-1]).unsqueeze(-1)
     configs_f_weight = torch.repeat_interleave(ref.forces_weight, ref.ptr[1:] -
                                                ref.ptr[:-1]).unsqueeze(-1)
-    weights = configs_weight * configs_f_weight
     mse = torch.square(ref["forces"] - pred["forces"])
     nll = 0.5 * (mse / pred["forces_var"] + torch.log(pred["forces_var"]))
-    return reduce_loss(weights * mse, ddp), reduce_loss(weights * nll, ddp)
+    return reduce_loss(configs_weight * configs_f_weight * nll, ddp)
 
 
 def mean_normed_error_forces(ref: Batch,
@@ -193,16 +181,15 @@ def mean_normed_error_forces(ref: Batch,
     return reduce_loss(mae, ddp)
 
 
-def laplace_nll_normed_forces(
-        ref: Batch,
-        pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
+def laplace_nll_normed_forces(ref: Batch,
+                              pred: TensorDict,
+                              ddp: Optional[bool] = None) -> torch.Tensor:
     b = torch.sqrt(pred["forces_var"] / 2.0)
     mae = torch.linalg.vector_norm(ref["forces"] - pred["forces"],
                                    ord=2,
                                    dim=-1)
     nll = (mae / b) + b
-    return reduce_loss(mae, ddp), reduce_loss(nll, ddp)
+    return reduce_loss(nll, ddp)
 
 
 # ------------------------------------------------------------------------------
@@ -219,15 +206,14 @@ def weighted_mean_squared_error_dipole(
     return reduce_loss(mse, ddp)
 
 
-def weighted_gaussian_nll_dipole(
-        ref: Batch,
-        pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
+def weighted_gaussian_nll_dipole(ref: Batch,
+                                 pred: TensorDict,
+                                 ddp: Optional[bool] = None) -> torch.Tensor:
     num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
     var_per_atom = pred["dipole_var"] / (num_atoms**2)
     mse = torch.square((ref["dipole"] - pred["dipole"]) / num_atoms)
     nll = 0.5 * (mse / var_per_atom + torch.log(var_per_atom))
-    return reduce_loss(mse, ddp), reduce_loss(nll, ddp)
+    return reduce_loss(nll, ddp)
 
 
 # ------------------------------------------------------------------------------
@@ -239,7 +225,7 @@ def weighted_mean_squared_error_polarizability(
         ref: Batch,
         pred: TensorDict,
         ddp: Optional[bool] = None) -> torch.Tensor:
-    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).view(-1, 1, 1)  # [n_graphs,1]
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).view(-1, 1, 1)
     mse = torch.square(
         (ref["polarizability"].view(-1, 3, 3) - pred["polarizability"]) /
         num_atoms)
@@ -249,14 +235,14 @@ def weighted_mean_squared_error_polarizability(
 def weighted_gaussian_nll_polarizability(
         ref: Batch,
         pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
-    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).view(-1, 1, 1)  # [n_graphs,1]
+        ddp: Optional[bool] = None) -> torch.Tensor:
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).view(-1, 1, 1)
     var_per_atom = pred["polarizability_var"] / (num_atoms**2)
     mse = torch.square(
         (ref["polarizability"].view(-1, 3, 3) - pred["polarizability"]) /
         num_atoms)
     nll = 0.5 * (mse / var_per_atom + torch.log(var_per_atom))
-    return reduce_loss(mse, ddp), reduce_loss(nll, ddp)
+    return reduce_loss(nll, ddp)
 
 
 # ------------------------------------------------------------------------------
@@ -290,7 +276,7 @@ def conditional_mse_forces(ref: Batch,
 def conditional_gaussian_nll_forces(
         ref: Batch,
         pred: TensorDict,
-        ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
+        ddp: Optional[bool] = None) -> torch.Tensor:
     configs_weight = torch.repeat_interleave(ref.weight, ref.ptr[1:] -
                                              ref.ptr[:-1]).unsqueeze(-1)
     configs_f_weight = torch.repeat_interleave(ref.forces_weight, ref.ptr[1:] -
@@ -298,7 +284,6 @@ def conditional_gaussian_nll_forces(
     factors = torch.tensor([1.0, 0.7, 0.4, 0.1],
                            device=ref["forces"].device,
                            dtype=ref["forces"].dtype)
-    weights = configs_weight * configs_f_weight * factors[3]
     err = ref["forces"] - pred["forces"]
     mse = torch.zeros_like(err)
     norm_forces = torch.norm(ref["forces"], dim=-1)
@@ -310,7 +295,8 @@ def conditional_gaussian_nll_forces(
     mse[c3] = torch.square(err[c3]) * factors[2]
     mse[~(c1 | c2 | c3)] = torch.square(err[~(c1 | c2 | c3)])
     nll = 0.5 * (mse / pred["forces_var"] + torch.log(pred["forces_var"]))
-    return reduce_loss(weights * mse, ddp), reduce_loss(weights * nll, ddp)
+    return reduce_loss(configs_weight * configs_f_weight * factors[3] * nll,
+                       ddp)
 
 
 def conditional_huber_forces(
@@ -371,45 +357,28 @@ def conditional_huber_nll_forces(
     c3 = (norm_f >= 200) & (norm_f < 300)
     c4 = ~(c1 | c2 | c3)
     he = torch.zeros_like(pred_f)
-    he[c1] = torch.nn.functional.huber_loss(ref_f[c1],
-                                            pred_f[c1],
+    he[c1] = torch.nn.functional.huber_loss(ref_f[c1] * inv_std[c1],
+                                            pred_f[c1] * inv_std[c1],
                                             reduction="none",
-                                            delta=factors[0])
-    he[c2] = torch.nn.functional.huber_loss(ref_f[c2],
-                                            pred_f[c2],
+                                            delta=factors[0],
+                                            weight=inv_std[c1])
+    he[c2] = torch.nn.functional.huber_loss(ref_f[c2] * inv_std[c2],
+                                            pred_f[c2] * inv_std[c2],
                                             reduction="none",
-                                            delta=factors[1])
-    he[c3] = torch.nn.functional.huber_loss(ref_f[c3],
-                                            pred_f[c3],
+                                            delta=factors[1],
+                                            weight=inv_std[c2])
+    he[c3] = torch.nn.functional.huber_loss(ref_f[c3] * inv_std[c3],
+                                            pred_f[c3] * inv_std[c3],
                                             reduction="none",
-                                            delta=factors[2])
-    he[c4] = torch.nn.functional.huber_loss(ref_f[c4],
-                                            pred_f[c4],
+                                            delta=factors[2],
+                                            weight=inv_std[c3])
+    he[c4] = torch.nn.functional.huber_loss(ref_f[c4] * inv_std[c4],
+                                            pred_f[c4] * inv_std[c4],
                                             reduction="none",
-                                            delta=factors[3])
-    she = torch.zeros_like(pred_f)
-    she[c1] = torch.nn.functional.huber_loss(ref_f[c1] * inv_std[c1],
-                                             pred_f[c1] * inv_std[c1],
-                                             reduction="none",
-                                             delta=factors[0],
-                                             weight=inv_std[c1])
-    she[c2] = torch.nn.functional.huber_loss(ref_f[c2] * inv_std[c2],
-                                             pred_f[c2] * inv_std[c2],
-                                             reduction="none",
-                                             delta=factors[1],
-                                             weight=inv_std[c2])
-    she[c3] = torch.nn.functional.huber_loss(ref_f[c3] * inv_std[c3],
-                                             pred_f[c3] * inv_std[c3],
-                                             reduction="none",
-                                             delta=factors[2],
-                                             weight=inv_std[c3])
-    she[c4] = torch.nn.functional.huber_loss(ref_f[c4] * inv_std[c4],
-                                             pred_f[c4] * inv_std[c4],
-                                             reduction="none",
-                                             delta=factors[3],
-                                             weight=inv_std[c4])
-    nll = she + torch.log(std) + log_z_delta
-    return reduce_loss(he, ddp), reduce_loss(nll, ddp)
+                                            delta=factors[3],
+                                            weight=inv_std[c4])
+    nll = he + torch.log(std) + log_z_delta
+    return reduce_loss(nll, ddp)
 
 
 def z_delta(delta: float) -> torch.Tensor:
@@ -445,32 +414,22 @@ def huber_nll_energy(
     huber_delta: float,
     log_z_delta: torch.Tensor,
     ddp: Optional[bool] = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> torch.Tensor:
     num_atoms = ref.ptr[1:] - ref.ptr[:-1]
-    ref_e_per_atom = ref["energy"] / num_atoms
-    pred_e_per_atom = pred["energy"] / num_atoms
     std_per_atom = torch.sqrt(pred["energy_var"]) / num_atoms
     inv_std_per_atom = 1.0 / std_per_atom
-    he = torch.nn.functional.huber_loss(
-        ref_e_per_atom,
-        pred_e_per_atom,
-        reduction="none",
-        delta=huber_delta,
-    )
     nll = torch.nn.functional.huber_loss(
-        ref_e_per_atom * inv_std_per_atom,
-        pred_e_per_atom * inv_std_per_atom,
+        ref["energy"] / num_atoms * inv_std_per_atom,
+        pred["energy"] / num_atoms * inv_std_per_atom,
         reduction="none",
         delta=huber_delta,
         weight=inv_std_per_atom,
     ) + torch.log(std_per_atom) + log_z_delta
     if ddp:
-        he = reduce_loss(he, ddp)
         nll = reduce_loss(nll, ddp)
     else:
-        he = he.mean()
         nll = nll.mean()
-    return he, nll
+    return nll
 
 
 def weighted_huber_energy(
@@ -499,32 +458,22 @@ def weighted_huber_nll_energy(
     huber_delta: float,
     log_z_delta: torch.Tensor,
     ddp: Optional[bool] = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> torch.Tensor:
     num_atoms = ref.ptr[1:] - ref.ptr[:-1]
-    ref_e_per_atom = ref.energy_weight * ref["energy"] / num_atoms
-    pred_e_per_atom = ref.energy_weight * pred["energy"] / num_atoms
     std_per_atom = torch.sqrt(pred["energy_var"]) / num_atoms
     inv_std_per_atom = 1.0 / std_per_atom
-    he = torch.nn.functional.huber_loss(
-        ref_e_per_atom,
-        pred_e_per_atom,
-        reduction="none",
-        delta=huber_delta,
-    )
     nll = torch.nn.functional.huber_loss(
-        ref_e_per_atom * inv_std_per_atom,
-        pred_e_per_atom * inv_std_per_atom,
+        ref.energy_weight * ref["energy"] / num_atoms * inv_std_per_atom,
+        ref.energy_weight * pred["energy"] / num_atoms * inv_std_per_atom,
         reduction="none",
         delta=huber_delta,
         weight=inv_std_per_atom,
     ) + torch.log(std_per_atom) + log_z_delta
     if ddp:
-        he = reduce_loss(he, ddp)
         nll = reduce_loss(nll, ddp)
     else:
-        he = he.mean()
         nll = nll.mean()
-    return he, nll
+    return nll
 
 
 def huber_forces(
@@ -552,15 +501,9 @@ def huber_nll_forces(
     huber_delta: float,
     log_z_delta: torch.Tensor,
     ddp: Optional[bool] = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> torch.Tensor:
     std = torch.sqrt(pred["forces_var"])
     inv_std = 1.0 / std
-    he = torch.nn.functional.huber_loss(
-        ref["forces"],
-        pred["forces"],
-        reduction="none",
-        delta=huber_delta,
-    )
     nll = torch.nn.functional.huber_loss(
         ref["forces"] * inv_std,
         pred["forces"] * inv_std,
@@ -569,12 +512,10 @@ def huber_nll_forces(
         weight=inv_std,
     ) + torch.log(std) + log_z_delta
     if ddp:
-        he = reduce_loss(he, ddp)
         nll = reduce_loss(nll, ddp)
     else:
-        he = he.mean()
         nll = nll.mean()
-    return he, nll
+    return nll
 
 
 def huber_stress(
@@ -602,16 +543,10 @@ def huber_nll_stress(
     huber_delta: float,
     log_z_delta: torch.Tensor,
     ddp: Optional[bool] = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> torch.Tensor:
     std = torch.sqrt(pred["stress_var"])
     inv_std = 1.0 / std
-    raw_huber = torch.nn.functional.huber_loss(
-        ref["stress"],
-        pred["stress"],
-        reduction="none",
-        delta=huber_delta,
-    )
-    raw_nll = torch.nn.functional.huber_loss(
+    nll = torch.nn.functional.huber_loss(
         ref["stress"] * inv_std,
         pred["stress"] * inv_std,
         reduction="none",
@@ -619,12 +554,10 @@ def huber_nll_stress(
         weight=inv_std,
     ) + torch.log(std) + log_z_delta
     if ddp:
-        raw_huber = reduce_loss(raw_huber, ddp)
-        raw_nll = reduce_loss(raw_nll, ddp)
+        nll = reduce_loss(nll, ddp)
     else:
-        raw_huber = raw_huber.mean()
-        raw_nll = raw_nll.mean()
-    return raw_huber, raw_nll
+        nll = nll.mean()
+    return nll
 
 
 def weighted_huber_stress(
@@ -653,32 +586,22 @@ def weighted_huber_nll_stress(
     huber_delta: float,
     log_z_delta: torch.Tensor,
     ddp: Optional[bool] = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> torch.Tensor:
     configs_stress_weight = ref.stress_weight.view(-1, 1, 1)
-    ref_s = configs_stress_weight * ref["stress"]
-    pred_s = configs_stress_weight * pred["stress"]
     std = torch.sqrt(pred["stress_var"])
     inv_std = 1.0 / std
-    he = torch.nn.functional.huber_loss(
-        ref_s,
-        pred_s,
-        reduction="none",
-        delta=huber_delta,
-    )
     nll = torch.nn.functional.huber_loss(
-        ref_s * inv_std,
-        pred_s * inv_std,
+        configs_stress_weight * ref["stress"] * inv_std,
+        configs_stress_weight * pred["stress"] * inv_std,
         reduction="none",
         delta=huber_delta,
         weight=inv_std,
     ) + torch.log(std) + log_z_delta
     if ddp:
-        he = reduce_loss(he, ddp)
         nll = reduce_loss(nll, ddp)
     else:
-        he = he.mean()
         nll = nll.mean()
-    return he, nll
+    return nll
 
 
 # ------------------------------------------------------------------------------
@@ -715,11 +638,7 @@ class WeightedEnergyForcesLoss(torch.nn.Module):
 
 class WeightedEnergyForcesGaussianNLLLoss(torch.nn.Module):
 
-    def __init__(self,
-                 energy_weight=1.0,
-                 forces_weight=1.0,
-                 energy_uncertainty_weight=1.0,
-                 forces_uncertainty_weight=1.0) -> None:
+    def __init__(self, energy_weight=1.0, forces_weight=1.0) -> None:
         super().__init__()
         self.register_buffer(
             "energy_weight",
@@ -729,37 +648,20 @@ class WeightedEnergyForcesGaussianNLLLoss(torch.nn.Module):
             "forces_weight",
             torch.tensor(forces_weight, dtype=torch.get_default_dtype()),
         )
-        self.register_buffer(
-            "energy_uncertainty_weight",
-            torch.tensor(energy_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "forces_uncertainty_weight",
-            torch.tensor(forces_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_energy, loss_nll_energy = weighted_gaussian_nll_energy(
-            ref, pred, ddp=ddp)
-        loss_mse_forces, loss_nll_forces = gaussian_nll_forces(ref,
-                                                               pred,
-                                                               ddp=ddp)
-        return (self.energy_weight * loss_mse_energy +
-                self.forces_weight * loss_mse_forces +
-                self.energy_uncertainty_weight * loss_nll_energy +
-                self.forces_uncertainty_weight * loss_nll_forces)
+        loss_energy = weighted_gaussian_nll_energy(ref, pred, ddp=ddp)
+        loss_forces = gaussian_nll_forces(ref, pred, ddp=ddp)
+        return (self.energy_weight * loss_energy +
+                self.forces_weight * loss_forces)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, "
-            f"forces_weight={self.forces_weight:.3f}, "
-            f"energy_uncertainty_weight={self.energy_uncertainty_weight:.3f}, "
-            f"forces_uncertainty_weight={self.forces_uncertainty_weight:.3f})")
+            f"forces_weight={self.forces_weight:.3f})")
 
 
 class WeightedForcesLoss(torch.nn.Module):
@@ -784,18 +686,11 @@ class WeightedForcesLoss(torch.nn.Module):
 
 class WeightedForcesGaussianNLLLoss(torch.nn.Module):
 
-    def __init__(self,
-                 forces_weight: float = 1.0,
-                 forces_uncertainty_weight: float = 1.0) -> None:
+    def __init__(self, forces_weight=1.0) -> None:
         super().__init__()
         self.register_buffer(
             "forces_weight",
             torch.tensor(forces_weight, dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "forces_uncertainty_weight",
-            torch.tensor(forces_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
         )
 
     def forward(
@@ -804,15 +699,11 @@ class WeightedForcesGaussianNLLLoss(torch.nn.Module):
         pred: TensorDict,
         ddp: Optional[bool] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        loss_mse, loss_nll = gaussian_nll_forces(ref, pred, ddp=ddp)
-        return self.forces_weight * loss_mse + self.forces_nll_weight * loss_nll
+        loss_forces = gaussian_nll_forces(ref, pred, ddp=ddp)
+        return self.forces_weight * loss_forces
 
     def __repr__(self):
-        return (
-            f"{self.__class__.__name__}("
-            f"forces_weight={self.forces_weight.item():.3f}, "
-            f"forces_uncertainty_weight={self.forces_uncertainty_weight.item():.3f})"
-        )
+        return f"{self.__class__.__name__}(forces_weight={self.forces_weight:.3f})"
 
 
 class WeightedEnergyForcesStressLoss(torch.nn.Module):
@@ -858,10 +749,7 @@ class WeightedEnergyForcesStressGaussianNLLLoss(torch.nn.Module):
     def __init__(self,
                  energy_weight=1.0,
                  forces_weight=1.0,
-                 stress_weight=1.0,
-                 energy_uncertainty_weight=1.0,
-                 forces_uncertainty_weight=1.0,
-                 stress_uncertainty_weight=1.0) -> None:
+                 stress_weight=1.0) -> None:
         super().__init__()
         self.register_buffer(
             "energy_weight",
@@ -875,48 +763,23 @@ class WeightedEnergyForcesStressGaussianNLLLoss(torch.nn.Module):
             "stress_weight",
             torch.tensor(stress_weight, dtype=torch.get_default_dtype()),
         )
-        self.register_buffer(
-            "energy_uncertainty_weight",
-            torch.tensor(energy_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "forces_uncertainty_weight",
-            torch.tensor(forces_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "stress_uncertainty_weight",
-            torch.tensor(stress_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_energy, loss_nll_energy = weighted_gaussian_nll_energy(
-            ref, pred, ddp=ddp)
-        loss_mse_forces, loss_nll_forces = gaussian_nll_forces(ref,
-                                                               pred,
-                                                               ddp=ddp)
-        loss_mse_stress, loss_nll_stress = weighted_gaussian_nll_stress(
-            ref, pred, ddp=ddp)
-        return (self.energy_weight * loss_mse_energy +
-                self.forces_weight * loss_mse_forces +
-                self.stress_weight * loss_mse_stress +
-                self.energy_uncertainty_weight * loss_nll_energy +
-                self.forces_uncertainty_weight * loss_nll_forces +
-                self.stress_uncertainty_weight * loss_nll_stress)
+        loss_energy = weighted_gaussian_nll_energy(ref, pred, ddp=ddp)
+        loss_forces = gaussian_nll_forces(ref, pred, ddp=ddp)
+        loss_stress = weighted_gaussian_nll_stress(ref, pred, ddp=ddp)
+        return (self.energy_weight * loss_energy +
+                self.forces_weight * loss_forces +
+                self.stress_weight * loss_stress)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, "
-            f"forces_weight={self.forces_weight:.3f}, "
-            f"stress_weight={self.stress_weight:.3f}, "
-            f"energy_uncertainty_weight={self.energy_uncertainty_weight:.3f}, "
-            f"forces_uncertainty_weight={self.forces_uncertainty_weight:.3f}, "
-            f"stress_uncertainty_weight={self.stress_uncertainty_weight:.3f})")
+            f"forces_weight={self.forces_weight:.3f}, stress_weight={self.stress_weight:.3f})"
+        )
 
 
 class WeightedHuberEnergyForcesStressLoss(torch.nn.Module):
@@ -966,9 +829,6 @@ class WeightedHuberNLLEnergyForcesStressLoss(torch.nn.Module):
                  energy_weight=1.0,
                  forces_weight=1.0,
                  stress_weight=1.0,
-                 energy_uncertainty_weight=1.0,
-                 forces_uncertainty_weight=1.0,
-                 stress_uncertainty_weight=1.0,
                  huber_delta=0.01) -> None:
         super().__init__()
         # We store the huber_delta rather than a loss with fixed reduction.
@@ -985,47 +845,27 @@ class WeightedHuberNLLEnergyForcesStressLoss(torch.nn.Module):
             "stress_weight",
             torch.tensor(stress_weight, dtype=torch.get_default_dtype()),
         )
-        self.register_buffer(
-            "energy_uncertainty_weight",
-            torch.tensor(energy_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "forces_uncertainty_weight",
-            torch.tensor(forces_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "stress_uncertainty_weight",
-            torch.tensor(stress_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
         log_z_delta = torch.log(z_delta(self.huber_delta))
-        loss_huber_energy, loss_nll_energy = huber_nll_energy(
-            ref, pred, self.huber_delta, log_z_delta, ddp)
-        loss_huber_forces, loss_nll_forces = huber_nll_forces(
-            ref, pred, self.huber_delta, log_z_delta, ddp)
-        loss_huber_stress, loss_nll_stress = huber_nll_stress(
-            ref, pred, self.huber_delta, log_z_delta, ddp)
-        return (self.energy_weight * loss_huber_energy +
-                self.forces_weight * loss_huber_forces +
-                self.stress_weight * loss_huber_stress +
-                self.energy_uncertainty_weight * loss_nll_energy +
-                self.forces_uncertainty_weight * loss_nll_forces +
-                self.stress_uncertainty_weight * loss_nll_stress)
+        loss_energy = huber_nll_energy(ref, pred, self.huber_delta,
+                                       log_z_delta, ddp)
+        loss_forces = huber_nll_forces(ref, pred, self.huber_delta,
+                                       log_z_delta, ddp)
+        loss_stress = huber_nll_stress(ref, pred, self.huber_delta,
+                                       log_z_delta, ddp)
+        return (self.energy_weight * loss_energy +
+                self.forces_weight * loss_forces +
+                self.stress_weight * loss_stress)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, "
-            f"forces_weight={self.forces_weight:.3f}, stress_weight={self.stress_weight:.3f}, "
-            f"energy_uncertainty_weight={self.energy_uncertainty_weight:.3f}, "
-            f"forces_uncertainty_weight={self.forces_uncertainty_weight:.3f}, "
-            f"stress_uncertainty_weight={self.stress_uncertainty_weight:.3f})")
+            f"forces_weight={self.forces_weight:.3f}, stress_weight={self.stress_weight:.3f})"
+        )
 
 
 class UniversalLoss(torch.nn.Module):
@@ -1075,12 +915,8 @@ class UniversalNLLLoss(torch.nn.Module):
                  energy_weight=1.0,
                  forces_weight=1.0,
                  stress_weight=1.0,
-                 energy_uncertainty_weight=1.0,
-                 forces_uncertainty_weight=1.0,
-                 stress_uncertainty_weight=1.0,
                  huber_delta=0.01) -> None:
         super().__init__()
-        # We store the huber_delta rather than a loss with fixed reduction.
         self.huber_delta = huber_delta
         self.register_buffer(
             "energy_weight",
@@ -1094,47 +930,27 @@ class UniversalNLLLoss(torch.nn.Module):
             "stress_weight",
             torch.tensor(stress_weight, dtype=torch.get_default_dtype()),
         )
-        self.register_buffer(
-            "energy_uncertainty_weight",
-            torch.tensor(energy_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "forces_uncertainty_weight",
-            torch.tensor(forces_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "stress_uncertainty_weight",
-            torch.tensor(stress_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
         log_z_delta = torch.log(z_delta(self.huber_delta))
-        loss_huber_energy, loss_nll_energy = weighted_huber_nll_energy(
-            ref, pred, self.huber_delta, log_z_delta, ddp)
-        loss_huber_forces, loss_nll_forces = conditional_huber_nll_forces(
-            ref, pred, self.huber_delta, log_z_delta, ddp)
-        loss_huber_stress, loss_nll_stress = weighted_huber_nll_stress(
-            ref, pred, self.huber_delta, log_z_delta, ddp)
-        return (self.energy_weight * loss_huber_energy +
-                self.forces_weight * loss_huber_forces +
-                self.stress_weight * loss_huber_stress +
-                self.energy_uncertainty_weight * loss_nll_energy +
-                self.forces_uncertainty_weight * loss_nll_forces +
-                self.stress_uncertainty_weight * loss_nll_stress)
+        loss_energy = weighted_huber_nll_energy(ref, pred, self.huber_delta,
+                                                log_z_delta, ddp)
+        loss_forces = conditional_huber_nll_forces(ref, pred, self.huber_delta,
+                                                   log_z_delta, ddp)
+        loss_stress = weighted_huber_nll_stress(ref, pred, self.huber_delta,
+                                                log_z_delta, ddp)
+        return (self.energy_weight * loss_energy +
+                self.forces_weight * loss_forces +
+                self.stress_weight * loss_stress)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, "
-            f"forces_weight={self.forces_weight:.3f}, stress_weight={self.stress_weight:.3f}, "
-            f"energy_uncertainty_weight={self.energy_uncertainty_weight:.3f}, "
-            f"forces_uncertainty_weight={self.forces_uncertainty_weight:.3f}, "
-            f"stress_uncertainty_weight={self.stress_uncertainty_weight:.3f})")
+            f"forces_weight={self.forces_weight:.3f}, stress_weight={self.stress_weight:.3f})"
+        )
 
 
 class WeightedEnergyForcesVirialsLoss(torch.nn.Module):
@@ -1180,10 +996,7 @@ class WeightedEnergyForcesVirialsGaussianNLLLoss(torch.nn.Module):
     def __init__(self,
                  energy_weight=1.0,
                  forces_weight=1.0,
-                 virials_weight=1.0,
-                 energy_uncertainty_weight=1.0,
-                 forces_uncertainty_weight=1.0,
-                 virials_uncertainty_weight=1.0) -> None:
+                 virials_weight=1.0) -> None:
         super().__init__()
         self.register_buffer(
             "energy_weight",
@@ -1197,48 +1010,22 @@ class WeightedEnergyForcesVirialsGaussianNLLLoss(torch.nn.Module):
             "virials_weight",
             torch.tensor(virials_weight, dtype=torch.get_default_dtype()),
         )
-        self.register_buffer(
-            "energy_uncertainty_weight",
-            torch.tensor(energy_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "forces_uncertainty_weight",
-            torch.tensor(forces_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "virials_uncertainty_weight",
-            torch.tensor(virials_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_energy, loss_nll_energy = weighted_gaussian_nll_energy(
-            ref, pred, ddp=ddp)
-        loss_mse_forces, loss_nll_forces = gaussian_nll_forces(ref,
-                                                               pred,
-                                                               ddp=ddp)
-        loss_mse_virials, loss_nll_virials = weighted_gaussian_nll_virials(
-            ref, pred, ddp=ddp)
-        return (self.energy_weight * loss_mse_energy +
-                self.forces_weight * loss_mse_forces +
-                self.virials_weight * loss_mse_virials +
-                self.energy_uncertainty_weight * loss_nll_energy +
-                self.forces_uncertainty_weight * loss_nll_forces +
-                self.virials_uncertainty_weight * loss_nll_virials)
+        loss_energy = weighted_gaussian_nll_energy(ref, pred, ddp=ddp)
+        loss_forces = gaussian_nll_forces(ref, pred, ddp=ddp)
+        loss_virials = weighted_gaussian_nll_virials(ref, pred, ddp=ddp)
+        return (self.energy_weight * loss_energy +
+                self.forces_weight * loss_forces +
+                self.virials_weight * loss_virials)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, "
-            f"forces_weight={self.forces_weight:.3f}, "
-            f"virials_weight={self.virials_weight:.3f}, "
-            f"energy_uncertainty_weight={self.energy_uncertainty_weight:.3f}, "
-            f"forces_uncertainty_weight={self.forces_uncertainty_weight:.3f}, "
-            f"virials_uncertainty_weight={self.virials_uncertainty_weight:.3f})"
+            f"forces_weight={self.forces_weight:.3f}, virials_weight={self.virials_weight:.3f})"
         )
 
 
@@ -1255,8 +1042,7 @@ class DipoleSingleLoss(torch.nn.Module):
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss = (weighted_mean_squared_error_dipole(ref, pred, ddp) * 100.0
-                )  # scale adjustment
+        loss = weighted_mean_squared_error_dipole(ref, pred, ddp) * 100.0
         return self.dipole_weight * loss
 
     def __repr__(self):
@@ -1265,44 +1051,27 @@ class DipoleSingleLoss(torch.nn.Module):
 
 class DipoleSingleGaussianNLLLoss(torch.nn.Module):
 
-    def __init__(self,
-                 dipole_weight=1.0,
-                 dipole_uncertainty_weight=1.0) -> None:
+    def __init__(self, dipole_weight=1.0) -> None:
         super().__init__()
         self.register_buffer(
             "dipole_weight",
             torch.tensor(dipole_weight, dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "dipole_uncertainty_weight",
-            torch.tensor(dipole_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
         )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_dipole, loss_nll_dipole = (
-            weighted_gaussian_nll_dipole(ref, pred, ddp) * 100.0
-        )  # scale adjustment
-        return self.dipole_weight * loss_mse_dipole + self.dipole_uncertainty_weight * loss_nll_dipole
+        loss = weighted_gaussian_nll_dipole(ref, pred, ddp) * 100.0
+        return self.dipole_weight * loss
 
     def __repr__(self):
-        return (
-            f"{self.__class__.__name__}(dipole_weight={self.dipole_weight:.3f}, "
-            f"dipole_uncertainty_weight={self.dipole_uncertainty_weight:.3f})")
+        return f"{self.__class__.__name__}(dipole_weight={self.dipole_weight:.3f})"
 
 
 class DipolePolarLoss(torch.nn.Module):
 
-    def __init__(
-        self,
-        dipole_weight=1.0,
-        polarizability_weight=1.0
-    ) -> (
-            None
-    ):  # dipole_mean=None,dipole_std=None,polarizability_mean=None,polarizability_std=None
+    def __init__(self, dipole_weight=1.0, polarizability_weight=1.0) -> (None):
         super().__init__()
         self.register_buffer(
             "dipole_weight",
@@ -1318,13 +1087,10 @@ class DipolePolarLoss(torch.nn.Module):
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_dipole = weighted_mean_squared_error_dipole(
-            ref, pred, ddp
-        )  # ,self.dipole_mean,self.dipole_std) #* 100.0  # scale adjustment
+        loss_dipole = weighted_mean_squared_error_dipole(ref, pred, ddp)
 
         loss_polarizability = weighted_mean_squared_error_polarizability(
-            ref, pred, ddp
-        )  # ,self.polarizability_mean,self.polarizability_std) #* 100.0  # scale adjustment
+            ref, pred, ddp)
         return (self.dipole_weight * loss_dipole +
                 self.polarizability_weight * loss_polarizability)
 
@@ -1337,15 +1103,7 @@ class DipolePolarLoss(torch.nn.Module):
 
 class DipolePolarGaussianNLLLoss(torch.nn.Module):
 
-    def __init__(
-        self,
-        dipole_weight=1.0,
-        polarizability_weight=1.0,
-        dipole_uncertainty_weight=1.0,
-        polarizability_uncertainty_weight=1.0
-    ) -> (
-            None
-    ):  # dipole_mean=None,dipole_std=None,polarizability_mean=None,polarizability_std=None
+    def __init__(self, dipole_weight=1.0, polarizability_weight=1.0) -> (None):
         super().__init__()
         self.register_buffer(
             "dipole_weight",
@@ -1356,41 +1114,22 @@ class DipolePolarGaussianNLLLoss(torch.nn.Module):
             torch.tensor(polarizability_weight,
                          dtype=torch.get_default_dtype()),
         )
-        self.register_buffer(
-            "dipole_uncertainty_weight",
-            torch.tensor(dipole_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "polarizability_uncertainty_weight",
-            torch.tensor(polarizability_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_dipole, loss_nll_dipole = weighted_gaussian_nll_dipole(
-            ref, pred, ddp
-        )  # ,self.dipole_mean,self.dipole_std) #* 100.0  # scale adjustment
+        loss_dipole = weighted_gaussian_nll_dipole(ref, pred, ddp)
 
-        loss_mse_polarizability, loss_nll_polarizability = weighted_gaussian_nll_polarizability(
-            ref, pred, ddp
-        )  # ,self.polarizability_mean,self.polarizability_std) #* 100.0  # scale adjustment
-        return (
-            self.dipole_weight * loss_mse_dipole +
-            self.polarizability_weight * loss_mse_polarizability +
-            self.dipole_uncertainty_weight * loss_nll_dipole +
-            self.polarizability_uncertainty_weight * loss_nll_polarizability)
+        loss_polarizability = weighted_gaussian_nll_polarizability(
+            ref, pred, ddp)
+        return (self.dipole_weight * loss_dipole +
+                self.polarizability_weight * loss_polarizability)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}("
-            f"dipole_weight={self.dipole_weight:.3f}, "
-            f"polarizability_weight={self.polarizability_weight:.3f}, "
-            f"dipole_uncertainty_weight={self.dipole_uncertainty_weight:.3f}, "
-            f"polarizability_uncertainty_weight={self.polarizability_uncertainty_weight:.3f})"
+            f"dipole_weight={self.dipole_weight:.3f}, polarizability_weight={self.polarizability_weight:.3f})"
         )
 
 
@@ -1438,10 +1177,7 @@ class WeightedEnergyForcesDipoleGaussianNLLLoss(torch.nn.Module):
     def __init__(self,
                  energy_weight=1.0,
                  forces_weight=1.0,
-                 dipole_weight=1.0,
-                 energy_uncertainty_weight=1.0,
-                 forces_uncertainty_weight=1.0,
-                 dipole_uncertainty_weight=1.0) -> None:
+                 dipole_weight=1.0) -> None:
         super().__init__()
         self.register_buffer(
             "energy_weight",
@@ -1455,45 +1191,23 @@ class WeightedEnergyForcesDipoleGaussianNLLLoss(torch.nn.Module):
             "dipole_weight",
             torch.tensor(dipole_weight, dtype=torch.get_default_dtype()),
         )
-        self.register_buffer(
-            "energy_uncertainty_weight",
-            torch.tensor(energy_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "forces_uncertainty_weight",
-            torch.tensor(forces_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "dipole_uncertainty_weight",
-            torch.tensor(dipole_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_energy, loss_nll_energy = weighted_gaussian_nll_energy(
-            ref, pred, ddp)
-        loss_mse_forces, loss_nll_forces = gaussian_nll_forces(ref, pred, ddp)
-        loss_mse_dipole, loss_nll_dipole = weighted_gaussian_nll_dipole(
-            ref, pred, ddp) * 100.0
-        return (self.energy_weight * loss_mse_energy +
-                self.forces_weight * loss_mse_forces +
-                self.dipole_weight * loss_mse_dipole +
-                self.energy_uncertainty_weight * loss_nll_energy +
-                self.forces_uncertainty_weight * loss_nll_forces +
-                self.dipole_uncertainty_weight * loss_nll_dipole)
+        loss_energy = weighted_gaussian_nll_energy(ref, pred, ddp)
+        loss_forces = gaussian_nll_forces(ref, pred, ddp)
+        loss_dipole = weighted_gaussian_nll_dipole(ref, pred, ddp) * 100.0
+        return (self.energy_weight * loss_energy +
+                self.forces_weight * loss_forces +
+                self.dipole_weight * loss_dipole)
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, "
-            f"forces_weight={self.forces_weight:.3f}, dipole_weight={self.dipole_weight:.3f}, "
-            f"energy_uncertainty_weight={self.energy_uncertainty_weight:.3f}, "
-            f"forces_uncertainty_weight={self.forces_uncertainty_weight:.3f}, "
-            f"dipole_uncertainty_weight={self.dipole_uncertainty_weight:.3f})")
+            f"forces_weight={self.forces_weight:.3f}, dipole_weight={self.dipole_weight:.3f})"
+        )
 
 
 class WeightedEnergyForcesL1L2Loss(torch.nn.Module):
@@ -1525,11 +1239,7 @@ class WeightedEnergyForcesL1L2Loss(torch.nn.Module):
 
 class WeightedEnergyForcesL1L2LaplaceNLLLoss(torch.nn.Module):
 
-    def __init__(self,
-                 energy_weight=1.0,
-                 forces_weight=1.0,
-                 energy_uncertainty_weight=1.0,
-                 forces_uncertainty_weight=1.0) -> None:
+    def __init__(self, energy_weight=1.0, forces_weight=1.0) -> None:
         super().__init__()
         self.register_buffer(
             "energy_weight",
@@ -1539,33 +1249,16 @@ class WeightedEnergyForcesL1L2LaplaceNLLLoss(torch.nn.Module):
             "forces_weight",
             torch.tensor(forces_weight, dtype=torch.get_default_dtype()),
         )
-        self.register_buffer(
-            "energy_uncertainty_weight",
-            torch.tensor(energy_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "forces_uncertainty_weight",
-            torch.tensor(forces_uncertainty_weight,
-                         dtype=torch.get_default_dtype()),
-        )
 
     def forward(self,
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mae_energy, loss_nll_energy = weighted_laplace_nll_energy(
-            ref, pred, ddp)
-        loss_mae_forces, loss_nll_forces = laplace_nll_normed_forces(
-            ref, pred, ddp)
-        return (self.energy_weight * loss_mae_energy +
-                self.forces_weight * loss_mae_forces +
-                self.energy_uncertainty_weight * loss_nll_energy +
-                self.forces_uncertainty_weight * loss_nll_forces)
+        loss_energy = weighted_laplace_nll_energy(ref, pred, ddp)
+        loss_forces = laplace_nll_normed_forces(ref, pred, ddp)
+        return self.energy_weight * loss_energy + self.forces_weight * loss_forces
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, "
-            f"forces_weight={self.forces_weight:.3f}, "
-            f"energy_uncertainty_weight={self.energy_uncertainty_weight:.3f}, "
-            f"forces_uncertainty_weight={self.forces_uncertainty_weight:.3f})")
+            f"forces_weight={self.forces_weight:.3f})")
