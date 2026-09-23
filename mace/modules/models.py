@@ -451,7 +451,7 @@ class MACE(torch.nn.Module):
         virials_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
             node_energy_var_logits_raw = self.energy_var_readout(
-                node_feats_out, node_heads)
+                node_feats_concat[-1], node_heads)
             node_energy_var_logits = node_energy_var_logits_raw[
                 num_atoms_arange, node_heads]
             node_energy_var = torch.nn.functional.softplus(
@@ -463,7 +463,7 @@ class MACE(torch.nn.Module):
                                      dim_size=num_graphs)
 
             forces_var_logits_raw = self.force_var_readout(
-                node_feats_out, node_heads)
+                node_feats_concat[-1], node_heads)
             forces_var_logits = forces_var_logits_raw[num_atoms_arange,
                                                       node_heads]
             forces_var = torch.nn.functional.softplus(
@@ -471,7 +471,7 @@ class MACE(torch.nn.Module):
 
             if compute_virials or compute_stress:
                 node_virials_var_logits_raw = self.virial_var_readout(
-                    node_feats_out, node_heads)
+                    node_feats_concat[-1], node_heads)
                 node_virials_var_logits = node_virials_var_logits_raw[
                     num_atoms_arange, node_heads]
                 node_virials_var = torch.nn.functional.softplus(
@@ -679,7 +679,7 @@ class ScaleShiftMACE(MACE):
         virials_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
             node_energy_var_logits_raw = self.energy_var_readout(
-                node_feats_out, node_heads)
+                node_feats_list[-1], node_heads)
             node_energy_var_logits = node_energy_var_logits_raw[
                 num_atoms_arange, node_heads]
             node_energy_var = torch.nn.functional.softplus(
@@ -691,7 +691,7 @@ class ScaleShiftMACE(MACE):
                                      dim_size=num_graphs)
 
             forces_var_logits_raw = self.force_var_readout(
-                node_feats_out, node_heads)
+                node_feats_list[-1], node_heads)
             forces_var_logits = forces_var_logits_raw[num_atoms_arange,
                                                       node_heads]
             forces_var = torch.nn.functional.softplus(
@@ -699,7 +699,7 @@ class ScaleShiftMACE(MACE):
 
             if compute_virials or compute_stress:
                 node_virials_var_logits_raw = self.virial_var_readout(
-                    node_feats_out, node_heads)
+                    node_feats_list[-1], node_heads)
                 node_virials_var_logits = node_virials_var_logits_raw[
                     num_atoms_arange, node_heads]
                 node_virials_var = torch.nn.functional.softplus(
