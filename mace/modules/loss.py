@@ -56,7 +56,7 @@ def mean_squared_error_energy(ref: Batch,
     return reduce_loss(raw_loss, ddp)
 
 
-def nll_energy(
+def gaussian_nll_energy(
         ref: Batch,
         pred: TensorDict,
         ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
@@ -79,7 +79,7 @@ def weighted_mean_squared_error_energy(
     return reduce_loss(raw_loss, ddp)
 
 
-def weighted_nll_energy(
+def weighted_gaussian_nll_energy(
         ref: Batch,
         pred: TensorDict,
         ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
@@ -121,7 +121,7 @@ def weighted_mean_squared_stress(ref: Batch,
     return reduce_loss(raw_loss, ddp)
 
 
-def weighted_nll_stress(
+def weighted_gaussian_nll_stress(
         ref: Batch,
         pred: TensorDict,
         ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
@@ -149,7 +149,7 @@ def weighted_mean_squared_virials(ref: Batch,
     return reduce_loss(raw_loss, ddp)
 
 
-def weighted_nll_virials(
+def weighted_gaussian_nll_virials(
         ref: Batch,
         pred: TensorDict,
         ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
@@ -186,7 +186,7 @@ def mean_squared_error_forces(ref: Batch,
     return reduce_loss(raw_loss, ddp)
 
 
-def nll_forces(
+def gaussian_nll_forces(
         ref: Batch,
         pred: TensorDict,
         ddp: Optional[bool] = None) -> tuple[torch.Tensor, torch.Tensor]:
@@ -344,7 +344,7 @@ class WeightedEnergyForcesLoss(torch.nn.Module):
             f"forces_weight={self.forces_weight:.3f})")
 
 
-class WeightedEnergyForcesNLLLoss(torch.nn.Module):
+class WeightedEnergyForcesGaussianNLLLoss(torch.nn.Module):
 
     def __init__(self,
                  energy_weight=1.0,
@@ -375,10 +375,11 @@ class WeightedEnergyForcesNLLLoss(torch.nn.Module):
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_energy, loss_nll_energy = weighted_nll_energy(ref,
+        loss_mse_energy, loss_nll_energy = weighted_gaussian_nll_energy(
+            ref, pred, ddp=ddp)
+        loss_mse_forces, loss_nll_forces = gaussian_nll_forces(ref,
                                                                pred,
                                                                ddp=ddp)
-        loss_mse_forces, loss_nll_forces = nll_forces(ref, pred, ddp=ddp)
         return (self.energy_weight * loss_mse_energy +
                 self.forces_weight * loss_mse_forces +
                 self.energy_uncertainty_weight * loss_nll_energy +
@@ -412,7 +413,7 @@ class WeightedForcesLoss(torch.nn.Module):
         return f"{self.__class__.__name__}(forces_weight={self.forces_weight:.3f})"
 
 
-class WeightedForcesNLLLoss(torch.nn.Module):
+class WeightedForcesGaussianNLLLoss(torch.nn.Module):
 
     def __init__(self,
                  forces_weight: float = 1.0,
@@ -434,7 +435,7 @@ class WeightedForcesNLLLoss(torch.nn.Module):
         pred: TensorDict,
         ddp: Optional[bool] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        loss_mse, loss_nll = nll_forces(ref, pred, ddp=ddp)
+        loss_mse, loss_nll = gaussian_nll_forces(ref, pred, ddp=ddp)
         return self.forces_weight * loss_mse + self.forces_nll_weight * loss_nll
 
     def __repr__(self):
@@ -483,7 +484,7 @@ class WeightedEnergyForcesStressLoss(torch.nn.Module):
         )
 
 
-class WeightedEnergyForcesStressNLLLoss(torch.nn.Module):
+class WeightedEnergyForcesStressGaussianNLLLoss(torch.nn.Module):
 
     def __init__(self,
                  energy_weight=1.0,
@@ -525,13 +526,13 @@ class WeightedEnergyForcesStressNLLLoss(torch.nn.Module):
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_energy, loss_nll_energy = weighted_nll_energy(ref,
+        loss_mse_energy, loss_nll_energy = weighted_gaussian_nll_energy(
+            ref, pred, ddp=ddp)
+        loss_mse_forces, loss_nll_forces = gaussian_nll_forces(ref,
                                                                pred,
                                                                ddp=ddp)
-        loss_mse_forces, loss_nll_forces = nll_forces(ref, pred, ddp=ddp)
-        loss_mse_stress, loss_nll_stress = weighted_nll_stress(ref,
-                                                               pred,
-                                                               ddp=ddp)
+        loss_mse_stress, loss_nll_stress = weighted_gaussian_nll_stress(
+            ref, pred, ddp=ddp)
         return (self.energy_weight * loss_mse_energy +
                 self.forces_weight * loss_mse_forces +
                 self.stress_weight * loss_mse_stress +
@@ -745,7 +746,7 @@ class WeightedEnergyForcesVirialsLoss(torch.nn.Module):
         )
 
 
-class WeightedEnergyForcesVirialsNLLLoss(torch.nn.Module):
+class WeightedEnergyForcesVirialsGaussianNLLLoss(torch.nn.Module):
 
     def __init__(self,
                  energy_weight=1.0,
@@ -787,13 +788,13 @@ class WeightedEnergyForcesVirialsNLLLoss(torch.nn.Module):
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        loss_mse_energy, loss_nll_energy = weighted_nll_energy(ref,
+        loss_mse_energy, loss_nll_energy = weighted_gaussian_nll_energy(
+            ref, pred, ddp=ddp)
+        loss_mse_forces, loss_nll_forces = gaussian_nll_forces(ref,
                                                                pred,
                                                                ddp=ddp)
-        loss_mse_forces, loss_nll_forces = nll_forces(ref, pred, ddp=ddp)
-        loss_mse_virials, loss_nll_virials = weighted_nll_virials(ref,
-                                                                  pred,
-                                                                  ddp=ddp)
+        loss_mse_virials, loss_nll_virials = weighted_gaussian_nll_virials(
+            ref, pred, ddp=ddp)
         return (self.energy_weight * loss_mse_energy +
                 self.forces_weight * loss_mse_forces +
                 self.virials_weight * loss_mse_virials +

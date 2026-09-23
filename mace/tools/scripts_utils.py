@@ -666,7 +666,7 @@ def get_loss_fn(
 ) -> torch.nn.Module:
     if args.loss == "weighted":
         if args.compute_uncertainty:
-            loss_fn = modules.WeightedEnergyForcesNLLLoss(
+            loss_fn = modules.WeightedEnergyForcesGaussianNLLLoss(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 energy_uncertainty_weight=args.energy_uncertainty_weight,
@@ -677,7 +677,7 @@ def get_loss_fn(
                 forces_weight=args.forces_weight)
     elif args.loss == "forces_only":
         if args.compute_uncertainty:
-            loss_fn = modules.WeightedForcesNLLLoss(
+            loss_fn = modules.WeightedForcesGaussianNLLLoss(
                 forces_weight=args.forces_weight,
                 forces_uncertainty_weight=args.forces_uncertainty_weight)
         else:
@@ -685,7 +685,7 @@ def get_loss_fn(
                 forces_weight=args.forces_weight)
     elif args.loss == "virials":
         if args.compute_uncertainty:
-            loss_fn = modules.WeightedEnergyForcesVirialsNLLLoss(
+            loss_fn = modules.WeightedEnergyForcesVirialsGaussianNLLLoss(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 virials_weight=args.virials_weight,
@@ -700,7 +700,7 @@ def get_loss_fn(
             )
     elif args.loss == "stress":
         if args.compute_uncertainty:
-            loss_fn = modules.WeightedEnergyForcesStressNLLLoss(
+            loss_fn = modules.WeightedEnergyForcesStressGaussianNLLLoss(
                 energy_weight=args.energy_weight,
                 forces_weight=args.forces_weight,
                 stress_weight=args.stress_weight,
@@ -775,7 +775,7 @@ def get_swa(
         raise ValueError("Can not select Stage Two with forces only loss.")
     if args.loss == "virials":
         if args.compute_uncertainty:
-            loss_fn_energy = modules.WeightedEnergyForcesVirialsNLLLoss(
+            loss_fn_energy = modules.WeightedEnergyForcesVirialsGaussianNLLLoss(
                 energy_weight=args.swa_energy_weight,
                 forces_weight=args.swa_forces_weight,
                 virials_weight=args.swa_virials_weight,
@@ -796,7 +796,7 @@ def get_swa(
             )
     elif args.loss == "stress":
         if args.compute_uncertainty:
-            loss_fn_energy = modules.WeightedEnergyForcesStressNLLLoss(
+            loss_fn_energy = modules.WeightedEnergyForcesStressGaussianNLLLoss(
                 energy_weight=args.swa_energy_weight,
                 forces_weight=args.swa_forces_weight,
                 stress_weight=args.swa_stress_weight,
@@ -843,7 +843,7 @@ def get_swa(
             f"Stage Two (after {args.start_swa} epochs) with loss function: {loss_fn_energy}, with energy weight : {args.swa_energy_weight}, forces weight : {args.swa_forces_weight}, stress weight : {args.swa_stress_weight} and learning rate : {args.swa_lr}"
         )
     elif args.compute_uncertainty:
-        loss_fn_energy = modules.WeightedEnergyForcesNLLLoss(
+        loss_fn_energy = modules.WeightedEnergyForcesGaussianNLLLoss(
             energy_weight=args.swa_energy_weight,
             forces_weight=args.swa_forces_weight,
             energy_uncertainty_weight=args.swa_energy_uncertainty_weight,
