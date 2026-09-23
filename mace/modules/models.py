@@ -29,7 +29,6 @@ from .blocks import (
     NonLinearReadoutBlock,
     RadialEmbeddingBlock,
     ScaleShiftBlock,
-    ScaleVarianceBlock,
 )
 from .utils import (
     compute_dielectric_gradients,
@@ -535,7 +534,6 @@ class ScaleShiftMACE(MACE):
         super().__init__(**kwargs)
         self.scale_shift = ScaleShiftBlock(scale=atomic_inter_scale,
                                            shift=atomic_inter_shift)
-        self.scale_variance = ScaleVarianceBlock(scale=atomic_inter_scale)
 
     def forward(
         self,
