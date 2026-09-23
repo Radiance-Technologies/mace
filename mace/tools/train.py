@@ -701,6 +701,8 @@ class MACELoss(Metric):
         self.add_state("energy_uncertainty_computed",
                        default=torch.tensor(0.0),
                        dist_reduce_fx="sum")
+        self.add_state("energy_var", default=[], dist_reduce_fx="cat")
+        self.add_state("energy_var_per_atom", default=[], dist_reduce_fx="cat")
         self.add_state("delta_es", default=[], dist_reduce_fx="cat")
         self.add_state("delta_es_per_atom", default=[], dist_reduce_fx="cat")
         self.add_state("Fs_computed",
@@ -711,13 +713,14 @@ class MACELoss(Metric):
         self.add_state("forces_uncertainty_computed",
                        default=torch.tensor(0.0),
                        dist_reduce_fx="sum")
-        self.add_state("forces_var_logits", default=[], dist_reduce_fx="cat")
+        self.add_state("forces_var", default=[], dist_reduce_fx="cat")
         self.add_state("stress_computed",
                        default=torch.tensor(0.0),
                        dist_reduce_fx="sum")
         self.add_state("stress_uncertainty_computed",
                        default=torch.tensor(0.0),
                        dist_reduce_fx="sum")
+        self.add_state("stress_var", default=[], dist_reduce_fx="cat")
         self.add_state("delta_stress", default=[], dist_reduce_fx="cat")
         self.add_state("virials_computed",
                        default=torch.tensor(0.0),
@@ -727,6 +730,10 @@ class MACELoss(Metric):
                        dist_reduce_fx="sum")
         self.add_state("delta_virials", default=[], dist_reduce_fx="cat")
         self.add_state("delta_virials_per_atom",
+                       default=[],
+                       dist_reduce_fx="cat")
+        self.add_state("virials_var", default=[], dist_reduce_fx="cat")
+        self.add_state("virials_var_per_atom",
                        default=[],
                        dist_reduce_fx="cat")
         self.add_state("Mus_computed",
@@ -759,9 +766,9 @@ class MACELoss(Metric):
                                                      batch.energy_weight)
 
         if output.get("energy_var") is not None:
-            logits = output["energy_var"].detach()
-            self.energy_var.append(logits)
-            self.energy_var_per_atom.append(logits /
+            var = output["energy_var"].detach()
+            self.energy_var.append(var)
+            self.energy_var_per_atom.append(var /
                                             (batch.ptr[1:] - batch.ptr[:-1]))
             self.energy_uncertainty_computed += filter_nonzero_weight(
                 batch,
@@ -814,10 +821,10 @@ class MACELoss(Metric):
                 batch, self.delta_virials, batch.weight, batch.virials_weight)
 
         if output.get("virials_var") is not None:
-            logits = output["virials_var"].detach()
-            self.virials_var.append(logits)
+            var = output["virials_var"].detach()
+            self.virials_var.append(var)
             self.virials_var_per_atom.append(
-                logits / (batch.ptr[1:] - batch.ptr[:-1]).view(-1, 1, 1))
+                var / (batch.ptr[1:] - batch.ptr[:-1]).view(-1, 1, 1))
 
             self.virials_uncertainty_computed += filter_nonzero_weight(
                 batch,
@@ -839,6 +846,7 @@ class MACELoss(Metric):
                 batch.dipole_weight,
                 spread_quantity_vector=False,
             )
+
         if (output.get("polarizability") is not None
                 and batch.polarizability is not None):
             self.delta_polarizability.append(batch.polarizability -
@@ -890,11 +898,11 @@ class MACELoss(Metric):
 
         if self.energy_uncertainty_computed:
             var = self.convert(self.energy_var)
-            std = np.sqrt(energy_var)
+            std = np.sqrt(var)
             aux["mean_energy_var"] = float(np.mean(var))
             aux["mean_energy_std"] = float(np.mean(std))
             var_per_atom = self.convert(self.energy_var_per_atom)
-            std_per_atom = np.sqrt(energy_var_per_atom)
+            std_per_atom = np.sqrt(var_per_atom)
             aux["mean_energy_var_per_atom"] = float(np.mean(var_per_atom))
             aux["mean_energy_std_per_atom"] = float(np.mean(std_per_atom))
 
