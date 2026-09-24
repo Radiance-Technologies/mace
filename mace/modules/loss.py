@@ -626,7 +626,7 @@ class WeightedEnergyForcesLoss(torch.nn.Module):
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        if pred["energy_var"] is not None and pred["force_var"] is not None:
+        if pred["energy_var"] is not None and pred["forces_var"] is not None:
             loss_energy = weighted_gaussian_nll_energy(ref, pred, ddp=ddp)
             loss_forces = gaussian_nll_forces(ref, pred, ddp=ddp)
         else:
@@ -653,7 +653,7 @@ class WeightedForcesLoss(torch.nn.Module):
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        if pred["force_var"] is not None:
+        if pred["forces_var"] is not None:
             loss_forces = gaussian_nll_forces(ref, pred, ddp=ddp)
         else:
             loss_forces = mean_squared_error_forces(ref, pred, ddp)
@@ -688,7 +688,7 @@ class WeightedEnergyForcesStressLoss(torch.nn.Module):
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
         if pred["energy_var"] is not None and pred[
-                "force_var"] is not None and pred["stress_var"] is not None:
+                "forces_var"] is not None and pred["stress_var"] is not None:
             loss_energy = weighted_gaussian_nll_energy(ref, pred, ddp=ddp)
             loss_forces = gaussian_nll_forces(ref, pred, ddp=ddp)
             loss_stress = weighted_gaussian_nll_stress(ref, pred, ddp=ddp)
@@ -735,7 +735,7 @@ class WeightedHuberEnergyForcesStressLoss(torch.nn.Module):
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
         if pred["energy_var"] is not None and pred[
-                "force_var"] is not None and pred["stress_var"] is not None:
+                "forces_var"] is not None and pred["stress_var"] is not None:
             log_z_delta = torch.log(z_delta(self.huber_delta))
             loss_energy = huber_nll_energy(ref, pred, self.huber_delta,
                                            log_z_delta, ddp)
@@ -785,7 +785,7 @@ class UniversalLoss(torch.nn.Module):
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
         if pred["energy_var"] is not None and pred[
-                "force_var"] is not None and pred["stress_var"] is not None:
+                "forces_var"] is not None and pred["stress_var"] is not None:
             log_z_delta = torch.log(z_delta(self.huber_delta))
             loss_energy = weighted_huber_nll_energy(ref, pred,
                                                     self.huber_delta,
@@ -839,7 +839,7 @@ class WeightedEnergyForcesVirialsLoss(torch.nn.Module):
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
         if pred["energy_var"] is not None and pred[
-                "force_var"] is not None and pred["virials_var"] is not None:
+                "forces_var"] is not None and pred["virials_var"] is not None:
             loss_energy = weighted_gaussian_nll_energy(ref, pred, ddp=ddp)
             loss_forces = gaussian_nll_forces(ref, pred, ddp=ddp)
             loss_virials = weighted_gaussian_nll_virials(ref, pred, ddp=ddp)
@@ -943,7 +943,7 @@ class WeightedEnergyForcesDipoleLoss(torch.nn.Module):
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
         if pred["energy_var"] is not None and pred[
-                "force_var"] is not None and pred["dipole_var"] is not None:
+                "forces_var"] is not None and pred["dipole_var"] is not None:
             loss_energy = weighted_gaussian_nll_energy(ref, pred, ddp)
             loss_forces = gaussian_nll_forces(ref, pred, ddp)
             loss_dipole = weighted_gaussian_nll_dipole(ref, pred, ddp) * 100.0
@@ -980,7 +980,7 @@ class WeightedEnergyForcesL1L2Loss(torch.nn.Module):
                 ref: Batch,
                 pred: TensorDict,
                 ddp: Optional[bool] = None) -> torch.Tensor:
-        if pred["energy_var"] is not None and pred["force_var"] is not None:
+        if pred["energy_var"] is not None and pred["forces_var"] is not None:
             loss_energy = weighted_laplace_nll_energy(ref, pred, ddp)
             loss_forces = laplace_nll_normed_forces(ref, pred, ddp)
         else:
