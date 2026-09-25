@@ -27,11 +27,13 @@ def compute_forces(
     eps: float = 1e-6,
 ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
     grad_outputs = [torch.ones_like(energy)]
-    grad_ef, _ = get_grad([energy], [positions], grad_outputs, training)
+    retain_graph = True if energy_cov is not None else training
+    grad_ef, _ = get_grad([energy], [positions], grad_outputs, retain_graph,
+                          training)
     forces = -grad_ef if grad_ef is not None else torch.zeros_like(positions)
     if energy_cov is not None:
         grad_cf, _ = get_grad([energy_cov], [positions], [energy_cov],
-                              training)
+                              training, training)
         forces_var = (4.0 * grad_cf.square() + eps if grad_cf is not None else
                       torch.full_like(positions, eps))
     else:
@@ -52,15 +54,16 @@ def compute_forces_virials(
            Optional[torch.Tensor], Optional[torch.Tensor]]:
 
     grad_outputs = [torch.ones_like(energy)]
+    retain_graph = True if energy_cov is not None else training
     grad_ef, grad_ev = get_grad([energy], [positions, displacement],
-                                grad_outputs, training)
+                                grad_outputs, retain_graph, training)
     forces = -grad_ef if grad_ef is not None else torch.zeros_like(positions)
     virials = -grad_ev if grad_ev is not None else torch.zeros_like(
         displacement)
 
     if energy_cov is not None:
         grad_cf, grad_cv = get_grad([energy_cov], [positions, displacement],
-                                    [energy_cov], training)
+                                    [energy_cov], training, training)
         forces_var = (4.0 * grad_cf.square() + eps if grad_cf is not None else
                       torch.full_like(positions, eps))
         virials_var = (4.0 * grad_cv.square() if grad_cv is not None else
@@ -93,14 +96,15 @@ def compute_forces_virials(
 
 
 def get_grad(
-        outputs: list[torch.Tensor], inputs: list[torch.Tensor],
-        grad_outputs: list[torch.Tensor], training: bool
+    outputs: list[torch.Tensor], inputs: list[torch.Tensor],
+    grad_outputs: list[torch.Tensor], retain_graph: bool, create_graph: bool
 ) -> tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
     grads = torch.autograd.grad(
         outputs=outputs,
         inputs=inputs,
         grad_outputs=grad_outputs,
-        create_graph=training,
+        retain_graph=retain_graph,
+        create_graph=create_graph,
         allow_unused=True,
     )
     grads_len = len(grads)
