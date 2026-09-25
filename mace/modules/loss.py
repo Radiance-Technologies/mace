@@ -141,29 +141,29 @@ class SingleLoss(Loss, ABC):
             return loss_sum * world_size / total_samples
         return raw_loss.mean()
 
-    def _assign(self, obj: Batch | TensorDict, key: str) -> torch.Tensor:
+    def _assign(self, ref: Batch, key: str) -> torch.Tensor:
         """
-        Assign value matching key from obj to variable.
+        Assign value matching key from ref to variable.
 
         Parameters
         ----------
-        obj : Batch | TensorDict
-            Either a ref or pred object.
+        ref : Batch
+            Reference
         key : str
             Key to grab from ref or pred.
 
         Returns
         -------
         torch.Tensor
-            Value matching key from obj.
+            Value matching key from ref.
 
         Raises
         ------
         ValueError
-            Object must have the key.
+            Reference must have the key.
         """
-        if (value := getattr(obj, key, None)) is None:
-            raise ValueError(f"{type(obj)} must have {key}.")
+        if (value := getattr(ref, key, None)) is None:
+            raise ValueError(f"Batch must have {key}.")
         return value
 
     def _pred_b(self, pred_var: torch.Tensor) -> torch.Tensor:
@@ -295,6 +295,31 @@ class SingleLoss(Loss, ABC):
             Value matching key from ref.
         """
         return self._assign(ref, key)
+
+    def _assign_pred_value(self, pred: TensorDict, key: str) -> torch.Tensor:
+        """
+            Assign value matching key from pred to variable.
+
+            Parameters
+            ----------
+            pred : TensorDict
+                Prediction.
+            key : str
+                Key to grab from ref.
+
+            Returns
+            -------
+            torch.Tensor
+                Value matching key from pred.
+
+            Raises
+            ------
+            ValueError
+                TensorDict must have the key.
+            """
+        if (value := pred.get(key, None)) is None:
+            raise ValueError(f"TensorDict must have {key}.")
+        return value
 
 
 class WeightedLoss(SingleLoss, ABC):
@@ -540,7 +565,7 @@ class TotalLoss(SingleLoss, ABC):
         """
         pred_var: Optional[torch.Tensor] = getattr(pred, f"{key}_var", None)
         ref_value = self._assign_ref_value(ref, key)
-        pred_value = self._assign(pred, key)
+        pred_value = self._assign_pred_value(pred, key)
         error = ref_value - pred_value
         match self.mode:
             case 'huber':
@@ -770,7 +795,7 @@ class LossPerAtom(SingleLoss, ABC):
         num_atoms = self._assign_num_atoms(ptr)
         pred_var: Optional[torch.Tensor] = getattr(pred, f"{key}_var", None)
         ref_value_per_atom = self._assign_ref_value(ref, key) / num_atoms
-        pred_value_per_atom = self._assign(pred, key) / num_atoms
+        pred_value_per_atom = self._assign_pred_value(pred, key) / num_atoms
         error_per_atom = ref_value_per_atom - pred_value_per_atom
 
         match self.mode:
@@ -1451,7 +1476,7 @@ class ForcesLoss(WeightedTotalLoss):
         weights = self._get_weights(ref, 'forces', num_atoms)
         pred_var: Optional[torch.Tensor] = getattr(pred, f"forces_var", None)
         ref_value = self._assign_ref_value(ref, 'forces')
-        pred_value = self._assign(pred, 'forces')
+        pred_value = self._assign_pred_value(pred, 'forces')
         error = ref_value - pred_value
         match self.mode:
             case 'huber':
