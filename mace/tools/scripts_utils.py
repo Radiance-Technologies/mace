@@ -339,6 +339,8 @@ def extract_config_mace_model(model: torch.nn.Module) -> Dict[str, Any]:
         if hasattr(model, "compute_uncertainty") else False,
         "eps":
         model.eps if hasattr(model, "eps") else 1e-6,
+        "cov_dim":
+        model.cov_dim if hasattr(model, "cov_dim") else 16,
     }
     if model.__class__.__name__ == "AtomicDielectricMACE":
         config["use_polarizability"] = model.use_polarizability

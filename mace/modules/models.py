@@ -82,7 +82,8 @@ class MACE(torch.nn.Module):
                      Type[NonLinearReadoutBlock]] = NonLinearReadoutBlock,
                  keep_last_layer_irreps: bool = False,
                  compute_uncertainty: bool = False,
-                 eps: float = 1e-6):
+                 eps: float = 1e-6,
+                 cov_dim: int = 16):
         super().__init__()
         self.register_buffer("atomic_numbers",
                              torch.tensor(atomic_numbers, dtype=torch.int64))
@@ -105,6 +106,7 @@ class MACE(torch.nn.Module):
         self.use_edge_irreps_first = use_edge_irreps_first
         self.compute_uncertainty = compute_uncertainty
         self.eps = eps
+        self.cov_dim = cov_dim
 
         # Embedding
         node_attr_irreps = o3.Irreps([(num_elements, (0, 1))])
@@ -274,29 +276,11 @@ class MACE(torch.nn.Module):
                         oeq_config,
                     ))
         if compute_uncertainty:
-            self.energy_var_readout = readout_cls(
+            self.energy_cov_readout = readout_cls(
                 hidden_irreps_out,
                 (len(heads) * MLP_irreps).simplify(),
                 gate,
-                o3.Irreps(f"{len(heads)}x0e"),
-                len(heads),
-                cueq_config,
-                oeq_config,
-            )
-            self.force_var_readout = readout_cls(
-                hidden_irreps_out,
-                (len(heads) * MLP_irreps).simplify(),
-                gate,
-                o3.Irreps(f"{3 * len(heads)}x0e"),
-                len(heads),
-                cueq_config,
-                oeq_config,
-            )
-            self.virial_var_readout = readout_cls(
-                hidden_irreps_out,
-                (len(heads) * MLP_irreps).simplify(),
-                gate,
-                o3.Irreps(f"{9 * len(heads)}x0e"),
+                o3.Irreps(f"{self.cov_dim * len(heads)}x0e"),
                 len(heads),
                 cueq_config,
                 oeq_config,
@@ -431,64 +415,42 @@ class MACE(torch.nn.Module):
                                 dim=-1)
         node_feats_out = torch.cat(node_feats_concat, dim=-1)
 
-        forces, virials, stress, hessian, edge_forces = get_outputs(
-            energy=total_energy,
-            positions=positions,
-            displacement=displacement,
-            vectors=vectors,
-            cell=cell,
-            training=training,
-            compute_force=compute_force,
-            compute_virials=compute_virials,
-            compute_stress=compute_stress,
-            compute_hessian=compute_hessian,
-            compute_edge_forces=compute_edge_forces,
-        )
+        node_energy_var: Optional[torch.Tensor] = None
+        energy_cov: Optional[torch.Tensor] = None
         energy_var: Optional[torch.Tensor] = None
-        forces_var: Optional[torch.Tensor] = None
-        stress_var: Optional[torch.Tensor] = None
-        virials_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
-            node_energy_var_logits_raw = self.energy_var_readout(
-                node_feats_concat[-1], node_heads)
-            node_energy_var_logits = node_energy_var_logits_raw[
-                num_atoms_arange, node_heads]
-            node_energy_var = torch.nn.functional.softplus(
-                node_energy_var_logits) + self.eps
+            node_energy_cov_logits_raw = self.energy_cov_readout(
+                node_feats_concat[-1],
+                node_heads).view(-1, len(self.heads), self.cov_dim)
 
-            energy_var = scatter_sum(src=node_energy_var,
+            node_energy_cov_logits = node_energy_cov_logits_raw[
+                num_atoms_arange, node_heads]
+
+            node_energy_var = torch.sum(node_energy_cov_logits**2,
+                                        dim=-1) + self.eps
+
+            energy_cov = scatter_sum(src=node_energy_cov_logits,
                                      index=data["batch"],
                                      dim=0,
                                      dim_size=num_graphs)
 
-            forces_var_logits_raw = self.force_var_readout(
-                node_feats_concat[-1],
-                node_heads).view(-1, len(self.heads), 3)
-            forces_var_logits = forces_var_logits_raw[num_atoms_arange,
-                                                      node_heads]
-            forces_var = torch.nn.functional.softplus(
-                forces_var_logits) + self.eps
+            energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
 
-            if compute_virials or compute_stress:
-                node_virials_var_logits_raw = self.virial_var_readout(
-                    node_feats_concat[-1],
-                    node_heads).view(-1, len(self.heads), 3, 3)
-                node_virials_var_logits = node_virials_var_logits_raw[
-                    num_atoms_arange, node_heads]
-                node_virials_var = torch.nn.functional.softplus(
-                    node_virials_var_logits) + self.eps
-
-                virials_var = scatter_sum(src=node_virials_var,
-                                          index=data["batch"],
-                                          dim=0,
-                                          dim_size=num_graphs)
-                if compute_stress:
-                    volume = torch.linalg.det(cell.view(-1, 3,
-                                                        3)).abs().unsqueeze(-1)
-                    stress_var = virials_var / (volume**2)
-                    stress_var = torch.where(
-                        torch.abs(stress_var) < 1e10, stress_var,
-                        torch.zeros_like(stress_var))
+        (forces, virials, stress, hessian, edge_forces, forces_var,
+         virials_var, stress_var, edge_forces_var) = get_outputs(
+             energy=total_energy,
+             positions=positions,
+             displacement=displacement,
+             vectors=vectors,
+             cell=cell,
+             training=training,
+             compute_force=compute_force,
+             compute_virials=compute_virials,
+             compute_stress=compute_stress,
+             compute_hessian=compute_hessian,
+             compute_edge_forces=compute_edge_forces,
+             energy_cov=energy_cov,
+             eps=self.eps)
 
         atomic_virials: Optional[torch.Tensor] = None
         atomic_stresses: Optional[torch.Tensor] = None
@@ -506,13 +468,15 @@ class MACE(torch.nn.Module):
             "energy": total_energy,
             "energy_var": energy_var,
             "node_energy": node_energy,
+            "node_energy_var": node_energy_var,
             "contributions": contributions,
             "forces": forces,
             "forces_var": forces_var,
             "edge_forces": edge_forces,
+            "edge_forces_var": edge_forces_var,
             "virials": virials,
-            "stress": stress,
             "virials_var": virials_var,
+            "stress": stress,
             "stress_var": stress_var,
             "atomic_virials": atomic_virials,
             "atomic_stresses": atomic_stresses,
@@ -556,7 +520,6 @@ class ScaleShiftMACE(MACE):
             compute_displacement=compute_displacement,
             lammps_mliap=lammps_mliap,
         )
-
         is_lammps = ctx.is_lammps
         num_atoms_arange = ctx.num_atoms_arange.to(torch.int64)
         num_graphs = ctx.num_graphs
@@ -660,66 +623,44 @@ class ScaleShiftMACE(MACE):
         total_energy = e0 + inter_e
         node_energy = node_e0.clone().double() + node_inter_es.clone().double()
 
-        forces, virials, stress, hessian, edge_forces = get_outputs(
-            energy=inter_e,
-            positions=positions,
-            displacement=displacement,
-            vectors=vectors,
-            cell=cell,
-            training=training,
-            compute_force=compute_force,
-            compute_virials=compute_virials,
-            compute_stress=compute_stress,
-            compute_hessian=compute_hessian,
-            compute_edge_forces=compute_edge_forces or compute_atomic_stresses,
-        )
-
+        node_energy_var: Optional[torch.Tensor] = None
+        energy_cov: Optional[torch.Tensor] = None
         energy_var: Optional[torch.Tensor] = None
-        forces_var: Optional[torch.Tensor] = None
-        stress_var: Optional[torch.Tensor] = None
-        virials_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
-            scale_sq = torch.atleast_1d(self.scale_shift.scale)**2
-            node_energy_var_logits_raw = self.energy_var_readout(
-                node_feats_list[-1], node_heads)
-            node_energy_var_logits = node_energy_var_logits_raw[
-                num_atoms_arange, node_heads]
-            node_energy_var = torch.nn.functional.softplus(
-                node_energy_var_logits) + self.eps
-            node_energy_var *= scale_sq
-            energy_var = scatter_sum(src=node_energy_var,
+            scale_sq = torch.atleast_1d(self.scale_shift.scale)
+            node_energy_cov_logits_raw = self.energy_cov_readout(
+                node_feats_list[-1], node_heads).view(-1, len(self.heads),
+                                                      self.cov_dim)
+
+            node_energy_cov_logits = node_energy_cov_logits_raw[
+                num_atoms_arange, node_heads] * scale_sq
+
+            node_energy_var = torch.sum(node_energy_cov_logits**2,
+                                        dim=-1) + self.eps
+
+            energy_cov = scatter_sum(src=node_energy_cov_logits,
                                      index=data["batch"],
                                      dim=0,
                                      dim_size=num_graphs)
 
-            forces_var_logits_raw = self.force_var_readout(
-                node_feats_list[-1], node_heads).view(-1, len(self.heads), 3)
-            forces_var_logits = forces_var_logits_raw[num_atoms_arange,
-                                                      node_heads]
-            forces_var = torch.nn.functional.softplus(
-                forces_var_logits) + self.eps
-            forces_var *= scale_sq
+            energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
 
-            if compute_virials or compute_stress:
-                node_virials_var_logits_raw = self.virial_var_readout(
-                    node_feats_list[-1],
-                    node_heads).view(-1, len(self.heads), 3, 3)
-                node_virials_var_logits = node_virials_var_logits_raw[
-                    num_atoms_arange, node_heads]
-                node_virials_var = torch.nn.functional.softplus(
-                    node_virials_var_logits) + self.eps
-                node_virials_var *= scale_sq
-                virials_var = scatter_sum(src=node_virials_var,
-                                          index=data["batch"],
-                                          dim=0,
-                                          dim_size=num_graphs)
-                if compute_stress:
-                    volume = torch.linalg.det(cell.view(-1, 3,
-                                                        3)).abs().unsqueeze(-1)
-                    stress_var = virials_var / (volume**2)
-                    stress_var = torch.where(
-                        torch.abs(stress_var) < 1e10, stress_var,
-                        torch.zeros_like(stress_var))
+        (forces, virials, stress, hessian, edge_forces, forces_var,
+         virials_var, stress_var, edge_forces_var) = get_outputs(
+             energy=inter_e,
+             positions=positions,
+             displacement=displacement,
+             vectors=vectors,
+             cell=cell,
+             training=training,
+             compute_force=compute_force,
+             compute_virials=compute_virials,
+             compute_stress=compute_stress,
+             compute_hessian=compute_hessian,
+             compute_edge_forces=(compute_edge_forces
+                                  or compute_atomic_stresses),
+             energy_cov=energy_cov,
+             eps=self.eps)
 
         atomic_virials: Optional[torch.Tensor] = None
         atomic_stresses: Optional[torch.Tensor] = None
@@ -737,13 +678,15 @@ class ScaleShiftMACE(MACE):
             "energy": total_energy,
             "energy_var": energy_var,
             "node_energy": node_energy,
+            "node_energy_var": node_energy_var,
             "interaction_energy": inter_e,
             "forces": forces,
             "forces_var": forces_var,
             "edge_forces": edge_forces,
+            "edge_forces_var": edge_forces_var,
             "virials": virials,
-            "stress": stress,
             "virials_var": virials_var,
+            "stress": stress,
             "stress_var": stress_var,
             "atomic_virials": atomic_virials,
             "atomic_stresses": atomic_stresses,
@@ -757,34 +700,36 @@ class ScaleShiftMACE(MACE):
 class AtomicDipolesMACE(torch.nn.Module):
 
     def __init__(
-            self,
-            r_max: float,
-            num_bessel: int,
-            num_polynomial_cutoff: int,
-            max_ell: int,
-            interaction_cls: Type[InteractionBlock],
-            interaction_cls_first: Type[InteractionBlock],
-            num_interactions: int,
-            num_elements: int,
-            hidden_irreps: o3.Irreps,
-            MLP_irreps: o3.Irreps,
-            avg_num_neighbors: float,
-            atomic_numbers: List[int],
-            correlation: int,
-            gate: Optional[Callable],
-            atomic_energies:
-        Optional[
+        self,
+        r_max: float,
+        num_bessel: int,
+        num_polynomial_cutoff: int,
+        max_ell: int,
+        interaction_cls: Type[InteractionBlock],
+        interaction_cls_first: Type[InteractionBlock],
+        num_interactions: int,
+        num_elements: int,
+        hidden_irreps: o3.Irreps,
+        MLP_irreps: o3.Irreps,
+        avg_num_neighbors: float,
+        atomic_numbers: List[int],
+        correlation: int,
+        gate: Optional[Callable],
+        atomic_energies: Optional[
             None],  # Just here to make it compatible with energy models, MUST be None
-            apply_cutoff: bool = True,  # pylint: disable=unused-argument
-            use_reduced_cg: bool = True,  # pylint: disable=unused-argument
-            use_so3: bool = False,  # pylint: disable=unused-argument
-            distance_transform: str = "None",  # pylint: disable=unused-argument
-            radial_type: Optional[str] = "bessel",
-            radial_MLP: Optional[List[int]] = None,
-            cueq_config: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
-            oeq_config: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
-            edge_irreps: Optional[o3.Irreps] = None,  # pylint: disable=unused-argument
-            use_edge_irreps_first: bool = False,  # pylint: disable=unused-argument
+        apply_cutoff: bool = True,  # pylint: disable=unused-argument
+        use_reduced_cg: bool = True,  # pylint: disable=unused-argument
+        use_so3: bool = False,  # pylint: disable=unused-argument
+        distance_transform: str = "None",  # pylint: disable=unused-argument
+        radial_type: Optional[str] = "bessel",
+        radial_MLP: Optional[List[int]] = None,
+        cueq_config: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
+        oeq_config: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
+        edge_irreps: Optional[o3.Irreps] = None,  # pylint: disable=unused-argument
+        use_edge_irreps_first: bool = False,  # pylint: disable=unused-argument
+        compute_uncertainty: bool = False,  # pylint: disable=unused-argument
+        eps: float = 1e-6,  # pylint: disable=unused-argument
+        cov_dim: int = 16  # pylint: disable=unused-argument
     ):
         super().__init__()
         self.register_buffer("atomic_numbers",
@@ -999,6 +944,9 @@ class AtomicDielectricMACE(torch.nn.Module):
             dipole_only: Optional[bool] = True,  # pylint: disable=unused-argument
             use_polarizability: Optional[bool] = True,  # pylint: disable=unused-argument
             means_stds: Optional[Dict[str, torch.Tensor]] = None,  # pylint: disable=W0613
+            compute_uncertainty: bool = False,  # pylint: disable=unused-argument
+            eps: float = 1e-6,  # pylint: disable=unused-argument
+            cov_dim: int = 16,  # pylint: disable=unused-argument
     ):
         super().__init__()
         self.register_buffer("atomic_numbers",
@@ -1292,31 +1240,34 @@ class AtomicDielectricMACE(torch.nn.Module):
 class EnergyDipolesMACE(torch.nn.Module):
 
     def __init__(
-            self,
-            r_max: float,
-            num_bessel: int,
-            num_polynomial_cutoff: int,
-            max_ell: int,
-            interaction_cls: Type[InteractionBlock],
-            interaction_cls_first: Type[InteractionBlock],
-            num_interactions: int,
-            num_elements: int,
-            hidden_irreps: o3.Irreps,
-            MLP_irreps: o3.Irreps,
-            avg_num_neighbors: float,
-            atomic_numbers: List[int],
-            correlation: int,
-            gate: Optional[Callable],
-            atomic_energies: Optional[np.ndarray],
-            apply_cutoff: bool = True,  # pylint: disable=unused-argument
-            use_reduced_cg: bool = True,  # pylint: disable=unused-argument
-            use_so3: bool = False,  # pylint: disable=unused-argument
-            distance_transform: str = "None",  # pylint: disable=unused-argument
-            radial_MLP: Optional[List[int]] = None,
-            cueq_config: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
-            oeq_config: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
-            edge_irreps: Optional[o3.Irreps] = None,  # pylint: disable=unused-argument
-            use_edge_irreps_first: bool = False,  # pylint: disable=unused-argument
+        self,
+        r_max: float,
+        num_bessel: int,
+        num_polynomial_cutoff: int,
+        max_ell: int,
+        interaction_cls: Type[InteractionBlock],
+        interaction_cls_first: Type[InteractionBlock],
+        num_interactions: int,
+        num_elements: int,
+        hidden_irreps: o3.Irreps,
+        MLP_irreps: o3.Irreps,
+        avg_num_neighbors: float,
+        atomic_numbers: List[int],
+        correlation: int,
+        gate: Optional[Callable],
+        atomic_energies: Optional[np.ndarray],
+        apply_cutoff: bool = True,  # pylint: disable=unused-argument
+        use_reduced_cg: bool = True,  # pylint: disable=unused-argument
+        use_so3: bool = False,  # pylint: disable=unused-argument
+        distance_transform: str = "None",  # pylint: disable=unused-argument
+        radial_MLP: Optional[List[int]] = None,
+        cueq_config: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
+        oeq_config: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
+        edge_irreps: Optional[o3.Irreps] = None,  # pylint: disable=unused-argument
+        use_edge_irreps_first: bool = False,  # pylint: disable=unused-argument
+        compute_uncertainty: bool = False,
+        eps: float = 1e-6,
+        cov_dim: int = 16,
     ):
         super().__init__()
         self.register_buffer("atomic_numbers",
@@ -1324,6 +1275,10 @@ class EnergyDipolesMACE(torch.nn.Module):
         self.register_buffer("r_max", torch.tensor(r_max, dtype=torch.float64))
         self.register_buffer("num_interactions",
                              torch.tensor(num_interactions, dtype=torch.int64))
+
+        self.compute_uncertainty = compute_uncertainty
+        self.eps = eps
+        self.cov_dim = cov_dim
         # Embedding
         node_attr_irreps = o3.Irreps([(num_elements, (0, 1))])
         node_feats_irreps = o3.Irreps([(hidden_irreps.count(o3.Irrep(0, 1)),
@@ -1417,6 +1372,14 @@ class EnergyDipolesMACE(torch.nn.Module):
                 self.readouts.append(
                     LinearDipoleReadoutBlock(hidden_irreps, dipole_only=False))
 
+        if compute_uncertainty:
+            self.energy_cov_readout = NonLinearDipoleReadoutBlock(
+                hidden_irreps_out,
+                MLP_irreps,
+                gate,
+                dipole_only=False,
+                cov_dim=self.cov_dim)
+
     def forward(
             self,
             data: Dict[str, torch.Tensor],
@@ -1455,6 +1418,7 @@ class EnergyDipolesMACE(torch.nn.Module):
         # Atomic energies
         node_e0 = self.atomic_energies_fn(
             data["node_attrs"])[num_atoms_arange, data["head"][data["batch"]]]
+
         e0 = scatter_sum(src=node_e0,
                          index=data["batch"],
                          dim=-1,
@@ -1476,6 +1440,8 @@ class EnergyDipolesMACE(torch.nn.Module):
         energies = [e0]
         node_energies_list = [node_e0]
         dipoles = []
+        node_feats_list: List[torch.Tensor] = []
+
         for interaction, product, readout in zip(self.interactions,
                                                  self.products, self.readouts):
             node_feats, sc = interaction(
@@ -1491,6 +1457,7 @@ class EnergyDipolesMACE(torch.nn.Module):
                 sc=sc,
                 node_attrs=data["node_attrs"],
             )
+            node_feats_list.append(node_feats)
             node_out = readout(node_feats).squeeze(-1)  # [n_nodes, ]
             # node_energies = readout(node_feats).squeeze(-1)  # [n_nodes, ]
             node_energies = node_out[:, 0]
@@ -1526,24 +1493,50 @@ class EnergyDipolesMACE(torch.nn.Module):
         )  # [n_graphs,3]
         total_dipole = total_dipole + baseline
 
-        forces, virials, stress, _, _ = get_outputs(
-            energy=total_energy,
-            positions=data["positions"],
-            displacement=displacement,
-            cell=data["cell"],
-            training=training,
-            compute_force=compute_force,
-            compute_virials=compute_virials,
-            compute_stress=compute_stress,
-        )
+        node_energy_var: Optional[torch.Tensor] = None
+        energy_cov: Optional[torch.Tensor] = None
+        energy_var: Optional[torch.Tensor] = None
+        if self.compute_uncertainty:
+            node_energy_cov_logits_raw = self.energy_cov_readout(
+                node_feats_list[-1], 1).view(-1, 1, self.cov_dim)
+
+            node_energy_cov_logits = node_energy_cov_logits_raw[
+                num_atoms_arange, data["head"][data["batch"]]]
+
+            node_energy_var = torch.sum(node_energy_cov_logits**2,
+                                        dim=-1) + self.eps
+
+            energy_cov = scatter_sum(src=node_energy_cov_logits,
+                                     index=data["batch"],
+                                     dim=0,
+                                     dim_size=num_graphs)
+
+            energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
+
+        (forces, virials, stress, _, _, forces_var, virials_var, stress_var,
+         _) = get_outputs(energy=total_energy,
+                          positions=data["positions"],
+                          displacement=displacement,
+                          cell=data["cell"],
+                          training=training,
+                          compute_force=compute_force,
+                          compute_virials=compute_virials,
+                          compute_stress=compute_stress,
+                          energy_cov=energy_cov,
+                          eps=self.eps)
 
         output = {
             "energy": total_energy,
+            "energy_var": energy_var,
             "node_energy": node_energy,
+            "node_energy_var": node_energy_var,
             "contributions": contributions,
             "forces": forces,
+            "forces_var": forces_var,
             "virials": virials,
+            "virials_var": virials_var,
             "stress": stress,
+            "stress_var": stress_var,
             "displacement": displacement,
             "dipole": total_dipole,
             "atomic_dipoles": atomic_dipoles,
