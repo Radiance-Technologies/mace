@@ -84,7 +84,7 @@ def main() -> None:
     """
 
     # ClearML automatically reads CLEARML_PARENT_TASK_ID from the environment
-    child_task = Task.init(project_name="MICA", task_name="MACE")
+    task = Task.init(project_name="MICA", task_name="MACE")
     args = tools.build_default_arg_parser().parse_args()
     run(args)
 
