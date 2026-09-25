@@ -75,12 +75,16 @@ from mace.tools.scripts_utils import (
 )
 from mace.tools.tables_utils import create_error_table
 from mace.tools.utils import AtomicNumberTable
+from clearml import Task
 
 
 def main() -> None:
     """
     This script runs the training/fine tuning for mace
     """
+
+    # ClearML automatically reads CLEARML_PARENT_TASK_ID from the environment
+    child_task = Task.init(project_name="MICA", task_name="MACE")
     args = tools.build_default_arg_parser().parse_args()
     run(args)
 
