@@ -201,13 +201,13 @@ def create_error_table(
             ])
         elif (table_type == "TotalRMSEuncertainty"
               and metrics["mean_energy_std"] is not None
-              and metrics["mean_force_std"] is not None):
+              and metrics["mean_forces_std"] is not None):
             table.add_row([
                 name,
                 f"{metrics['rmse_e'] * 1000:8.1f}",
                 f"{metrics['mean_energy_std'] * 1000:8.2f}",
                 f"{metrics['rmse_f'] * 1000:8.1f}",
-                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['mean_forces_std'] * 1000:8.2f}",
                 f"{metrics['rel_rmse_f']:8.2f}",
             ])
         elif table_type == "PerAtomRMSE":
@@ -219,13 +219,13 @@ def create_error_table(
             ])
         elif (table_type == "PerAtomRMSEuncertainty"
               and metrics["mean_energy_std_per_atom"] is not None
-              and metrics["mean_force_std"] is not None):
+              and metrics["mean_forces_std"] is not None):
             table.add_row([
                 name,
                 f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
                 f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
                 f"{metrics['rmse_f'] * 1000:8.1f}",
-                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['mean_forces_std'] * 1000:8.2f}",
                 f"{metrics['rel_rmse_f']:8.2f}",
             ])
         elif (table_type == "PerAtomRMSEstressvirials"
@@ -267,14 +267,14 @@ def create_error_table(
         elif (table_type == "PerAtomRMSEstressvirialsuncertainty"
               and metrics["rmse_stress"] is not None
               and metrics["mean_energy_std_per_atom"] is not None
-              and metrics["mean_force_std"] is not None
+              and metrics["mean_forces_std"] is not None
               and metrics["mean_stress_std"] is not None):
             table.add_row([
                 name,
                 f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
                 f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
                 f"{metrics['rmse_f'] * 1000:8.1f}",
-                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['mean_forces_std'] * 1000:8.2f}",
                 f"{metrics['rel_rmse_f']:8.2f}",
                 f"{metrics['rmse_stress'] * 1000:8.1f}",
                 f"{metrics['mean_stress_std'] * 1000:8.2f}",
@@ -282,14 +282,14 @@ def create_error_table(
         elif (table_type == "PerAtomRMSEstressvirialsuncertainty"
               and metrics["rmse_virials_per_atom"] is not None
               and metrics["mean_energy_std_per_atom"] is not None
-              and metrics["mean_force_std"] is not None
+              and metrics["mean_forces_std"] is not None
               and metrics["mean_virials_std_per_atom"] is not None):
             table.add_row([
                 name,
                 f"{metrics['rmse_e_per_atom'] * 1000:8.1f}",
                 f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
                 f"{metrics['rmse_f'] * 1000:8.1f}",
-                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['mean_forces_std'] * 1000:8.2f}",
                 f"{metrics['rel_rmse_f']:8.2f}",
                 f"{metrics['rmse_virials_per_atom'] * 1000:8.1f}",
                 f"{metrics['mean_virials_std_per_atom'] * 1000:8.2f}",
@@ -297,14 +297,14 @@ def create_error_table(
         elif (table_type == "PerAtomMAEstressvirialsuncertainty"
               and metrics["mae_stress"] is not None
               and metrics["mean_energy_std_per_atom"] is not None
-              and metrics["mean_force_std"] is not None
+              and metrics["mean_forces_std"] is not None
               and metrics["mean_stress_std"] is not None):
             table.add_row([
                 name,
                 f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
                 f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
                 f"{metrics['mae_f'] * 1000:8.1f}",
-                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['mean_forces_std'] * 1000:8.2f}",
                 f"{metrics['rel_mae_f']:8.2f}",
                 f"{metrics['mae_stress'] * 1000:8.1f}",
                 f"{metrics['mean_stress_std'] * 1000:8.2f}",
@@ -312,14 +312,14 @@ def create_error_table(
         elif (table_type == "PerAtomMAEstressvirialsuncertainty"
               and metrics["mae_virials_per_atom"] is not None
               and metrics["mean_energy_std_per_atom"] is not None
-              and metrics["mean_force_std"] is not None
+              and metrics["mean_forces_std"] is not None
               and metrics["mean_virials_std_per_atom"] is not None):
             table.add_row([
                 name,
                 f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
                 f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
                 f"{metrics['mae_f'] * 1000:8.1f}",
-                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['mean_forces_std'] * 1000:8.2f}",
                 f"{metrics['rel_mae_f']:8.2f}",
                 f"{metrics['mae_virials_per_atom'] * 1000:8.1f}",
                 f"{metrics['mean_virials_std_per_atom'] * 1000:8.2f}",
@@ -333,13 +333,13 @@ def create_error_table(
             ])
         elif (table_type == "TotalMAEuncertainty"
               and metrics["mean_energy_std"] is not None
-              and metrics["mean_force_std"] is not None):
+              and metrics["mean_forces_std"] is not None):
             table.add_row([
                 name,
                 f"{metrics['mae_e'] * 1000:8.1f}",
                 f"{metrics['mean_energy_std'] * 1000:8.2f}",
                 f"{metrics['mae_f'] * 1000:8.1f}",
-                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['mean_forces_std'] * 1000:8.2f}",
                 f"{metrics['rel_mae_f']:8.2f}",
             ])
         elif table_type == "PerAtomMAE":
@@ -351,13 +351,13 @@ def create_error_table(
             ])
         elif (table_type == "PerAtomMAEuncertainty"
               and metrics["mean_energy_std_per_atom"] is not None
-              and metrics["mean_force_std"] is not None):
+              and metrics["mean_forces_std"] is not None):
             table.add_row([
                 name,
                 f"{metrics['mae_e_per_atom'] * 1000:8.1f}",
                 f"{metrics['mean_energy_std_per_atom'] * 1000:8.2f}",
                 f"{metrics['mae_f'] * 1000:8.1f}",
-                f"{metrics['mean_force_std'] * 1000:8.2f}",
+                f"{metrics['mean_forces_std'] * 1000:8.2f}",
                 f"{metrics['rel_mae_f']:8.2f}",
             ])
         elif table_type == "DipoleRMSE":

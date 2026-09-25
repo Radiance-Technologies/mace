@@ -26,18 +26,7 @@ from .blocks import (
 )
 from .extensions import PolarMACE
 from .gate import GatedEquivariantBlock
-from .loss import (
-    DipolePolarLoss,
-    DipoleSingleLoss,
-    UniversalLoss,
-    WeightedEnergyForcesDipoleLoss,
-    WeightedEnergyForcesL1L2Loss,
-    WeightedEnergyForcesLoss,
-    WeightedEnergyForcesStressLoss,
-    WeightedEnergyForcesVirialsLoss,
-    WeightedForcesLoss,
-    WeightedHuberEnergyForcesStressLoss,
-)
+from .loss import LossMode, CombinedLoss
 from .models import (
     MACE,
     AtomicDielectricMACE,
@@ -118,16 +107,8 @@ __all__ = [
     "AtomicDielectricMACE",
     "EnergyDipolesMACE",
     "PolarMACE",
-    "WeightedEnergyForcesLoss",
-    "WeightedForcesLoss",
-    "WeightedEnergyForcesVirialsLoss",
-    "WeightedEnergyForcesStressLoss",
-    "DipoleSingleLoss",
-    "DipolePolarLoss",
-    "WeightedEnergyForcesDipoleLoss",
-    "WeightedHuberEnergyForcesStressLoss",
-    "UniversalLoss",
-    "WeightedEnergyForcesL1L2Loss",
+    "LossMode",
+    "CombinedLoss",
     "SymmetricContraction",
     "interaction_classes",
     "compute_mean_std_atomic_inter_energy",

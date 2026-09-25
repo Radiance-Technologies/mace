@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from functools import wraps
-from typing import Callable, Tuple
+from typing import Callable, Tuple, TypeVar
 
 try:
     import torch._dynamo as dynamo
@@ -12,6 +12,8 @@ from torch.fx import symbolic_trace
 
 ModuleFactory = Callable[..., nn.Module]
 TypeTuple = Tuple[type, ...]
+
+T = TypeVar("T", bound=type[nn.Module])
 
 
 def configure_autograd_for_compile(allow_autograd: bool = True) -> None:
@@ -67,7 +69,7 @@ def prepare(func: ModuleFactory, allow_autograd: bool = True) -> ModuleFactory:
 _SIMPLIFY_REGISTRY = set()
 
 
-def simplify_if_compile(module: nn.Module) -> nn.Module:
+def simplify_if_compile(module: T) -> T:
     """Decorator to register a module for symbolic simplification
 
     The decorated module will be simplifed using `torch.fx.symbolic_trace`.
