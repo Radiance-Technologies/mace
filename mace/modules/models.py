@@ -419,20 +419,17 @@ class MACE(torch.nn.Module):
         energy_cov: Optional[torch.Tensor] = None
         energy_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
-            node_energy_cov_logits_raw = self.energy_cov_readout(
-                node_feats_concat[-1],
-                node_heads).view(-1, len(self.heads), self.cov_dim)
+            node_energy_cov_raw = self.energy_cov_readout(
+                node_feats, node_heads).view(-1, len(self.heads), self.cov_dim)
 
-            node_energy_cov_logits = node_energy_cov_logits_raw[
-                num_atoms_arange, node_heads]
+            node_energy_cov = node_energy_cov_raw[num_atoms_arange, node_heads]
 
-            node_energy_var = torch.sum(node_energy_cov_logits**2,
-                                        dim=-1) + self.eps
-
-            energy_cov = scatter_sum(src=node_energy_cov_logits,
+            energy_cov = scatter_sum(src=node_energy_cov,
                                      index=data["batch"],
                                      dim=0,
                                      dim_size=num_graphs)
+
+            node_energy_var = torch.sum(node_energy_cov**2, dim=-1) + self.eps
 
             energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
 
@@ -455,14 +452,17 @@ class MACE(torch.nn.Module):
         atomic_virials: Optional[torch.Tensor] = None
         atomic_stresses: Optional[torch.Tensor] = None
         if compute_atomic_stresses and edge_forces is not None:
-            atomic_virials, atomic_stresses = get_atomic_virials_stresses(
-                edge_forces=edge_forces,
-                edge_index=data["edge_index"],
-                vectors=vectors,
-                num_atoms=positions.shape[0],
-                batch=data["batch"],
-                cell=cell,
-            )
+            (atomic_virials, atomic_stresses, atomic_virials_var,
+             atomic_stresses_var) = get_atomic_virials_stresses(
+                 edge_forces=edge_forces,
+                 edge_index=data["edge_index"],
+                 vectors=vectors,
+                 num_atoms=positions.shape[0],
+                 batch=data["batch"],
+                 cell=cell,
+                 edge_forces_var=edge_forces_var,
+                 eps=self.eps,
+             )
 
         return {
             "energy": total_energy,
@@ -479,7 +479,9 @@ class MACE(torch.nn.Module):
             "stress": stress,
             "stress_var": stress_var,
             "atomic_virials": atomic_virials,
+            "atomic_virials_var": atomic_virials_var,
             "atomic_stresses": atomic_stresses,
+            "atomic_stresses_var": atomic_stresses_var,
             "displacement": displacement,
             "hessian": hessian,
             "node_feats": node_feats_out,
@@ -627,21 +629,27 @@ class ScaleShiftMACE(MACE):
         energy_cov: Optional[torch.Tensor] = None
         energy_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
-            scale_sq = torch.atleast_1d(self.scale_shift.scale)
-            node_energy_cov_logits_raw = self.energy_cov_readout(
-                node_feats_list[-1], node_heads).view(-1, len(self.heads),
-                                                      self.cov_dim)
+            node_energy_cov_raw = self.energy_cov_readout(
+                node_feats, node_heads).view(-1, len(self.heads), self.cov_dim)
 
-            node_energy_cov_logits = node_energy_cov_logits_raw[
-                num_atoms_arange, node_heads] * scale_sq
+            unscaled_node_energy_cov = node_energy_cov_raw[num_atoms_arange,
+                                                           node_heads]
 
-            node_energy_var = torch.sum(node_energy_cov_logits**2,
-                                        dim=-1) + self.eps
+            unscaled_energy_cov = scatter_sum(src=unscaled_node_energy_cov,
+                                              index=data["batch"],
+                                              dim=0,
+                                              dim_size=num_graphs)
 
-            energy_cov = scatter_sum(src=node_energy_cov_logits,
+            scale = torch.atleast_1d(self.scale_shift.scale)[node_heads]
+
+            node_energy_cov = unscaled_node_energy_cov * scale
+
+            energy_cov = scatter_sum(src=node_energy_cov,
                                      index=data["batch"],
                                      dim=0,
                                      dim_size=num_graphs)
+
+            node_energy_var = torch.sum(node_energy_cov**2, dim=-1) + self.eps
 
             energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
 
@@ -660,19 +668,23 @@ class ScaleShiftMACE(MACE):
              compute_edge_forces=(compute_edge_forces
                                   or compute_atomic_stresses),
              energy_cov=energy_cov,
+             energy_cov_weight=unscaled_energy_cov,
              eps=self.eps)
 
         atomic_virials: Optional[torch.Tensor] = None
         atomic_stresses: Optional[torch.Tensor] = None
         if compute_atomic_stresses and edge_forces is not None:
-            atomic_virials, atomic_stresses = get_atomic_virials_stresses(
-                edge_forces=edge_forces,
-                edge_index=data["edge_index"],
-                vectors=vectors,
-                num_atoms=positions.shape[0],
-                batch=data["batch"],
-                cell=cell,
-            )
+            (atomic_virials, atomic_stresses, atomic_virials_var,
+             atomic_stresses_var) = get_atomic_virials_stresses(
+                 edge_forces=edge_forces,
+                 edge_index=data["edge_index"],
+                 vectors=vectors,
+                 num_atoms=positions.shape[0],
+                 batch=data["batch"],
+                 cell=cell,
+                 edge_forces_var=edge_forces_var,
+                 eps=self.eps,
+             )
 
         return {
             "energy": total_energy,
@@ -689,7 +701,9 @@ class ScaleShiftMACE(MACE):
             "stress": stress,
             "stress_var": stress_var,
             "atomic_virials": atomic_virials,
+            "atomic_virials_var": atomic_virials_var,
             "atomic_stresses": atomic_stresses,
+            "atomic_stresses_var": atomic_stresses_var,
             "hessian": hessian,
             "displacement": displacement,
             "node_feats": node_feats_out,
@@ -831,6 +845,14 @@ class AtomicDipolesMACE(torch.nn.Module):
                 self.readouts.append(
                     LinearDipoleReadoutBlock(hidden_irreps, dipole_only=True))
 
+        if compute_uncertainty:
+            self.dipole_cov_readout = NonLinearDipoleReadoutBlock(
+                hidden_irreps_out,
+                MLP_irreps,
+                gate,
+                dipole_only=True,
+                cov_dim=self.cov_dim)
+
     def forward(
             self,
             data: Dict[str, torch.Tensor],
@@ -902,9 +924,29 @@ class AtomicDipolesMACE(torch.nn.Module):
         )  # [n_graphs,3]
         total_dipole = total_dipole + baseline
 
+        atomic_dipoles_var: Optional[torch.Tensor] = None
+        total_dipole_var: Optional[torch.Tensor] = None
+        if self.compute_uncertainty:
+            dipole_dim = node_dipoles.shape[1]
+            node_dipoles_cov_raw = self.dipole_cov_readout(node_feats).squeeze(
+                -1)
+            node_dipoles_cov = node_dipoles_cov_raw.view(
+                -1, dipole_dim, self.cov_dim)
+            atomic_dipoles_var = torch.sum(node_dipoles_cov**2, dim=-1)
+
+            total_dipole_var = scatter_sum(
+                src=atomic_dipoles_var,
+                index=data["batch"],
+                dim=0,
+                dim_size=num_graphs,
+            ) + self.eps
+            atomic_dipoles_var = atomic_dipoles_var + self.eps
+
         output = {
             "dipole": total_dipole,
+            "dipole_var": total_dipole_var,
             "atomic_dipoles": atomic_dipoles,
+            "atomic_dipoles_var": atomic_dipoles_var,
         }
         return output
 
@@ -1090,6 +1132,14 @@ class AtomicDielectricMACE(torch.nn.Module):
                         use_polarizability=True,
                     ))
 
+        if compute_uncertainty:
+            self.dipole_polar_cov_readout = NonLinearDipolePolarReadoutBlock(
+                hidden_irreps_out,
+                MLP_irreps,
+                gate,
+                use_polarizability=True,
+                cov_dim=self.cov_dim)
+
     def forward(
             self,
             data: Dict[str, torch.Tensor],
@@ -1224,12 +1274,103 @@ class AtomicDielectricMACE(torch.nn.Module):
             total_polarizability_spherical = None
             dalpha_dr = None
 
+        total_charges_var: Optional[torch.Tensor] = None
+        atomic_dipoles_var: Optional[torch.Tensor] = None
+        total_dipole_var: Optional[torch.Tensor] = None
+        total_polarizability_sh_var: Optional[torch.Tensor] = None
+        total_polarizability_var: Optional[torch.Tensor] = None
+        if self.compute_uncertainty:
+
+            cov_raw = self.dipole_polar_cov_readout(node_feats).squeeze(-1)
+            charge_dim = 1
+            dipole_dim = node_dipoles.shape[1]
+            start = 0
+            end = charge_dim * self.cov_dim
+            charges_cov = cov_raw[:, start:end]
+
+            atomic_charges_var = torch.sum(charges_cov**2, dim=-1)
+
+            total_charges_var = scatter_sum(
+                src=atomic_charges_var,
+                index=data["batch"],
+                dim=0,
+                dim_size=num_graphs,
+            ) + self.eps
+
+            if self.use_polarizability:
+                pol_dim = node_polarizability.shape[1]
+                iso_dim = 1
+                aniso_dim = pol_dim - iso_dim
+
+                start = end
+                end = start + (iso_dim * self.cov_dim)
+                pol_iso_cov = cov_raw[:,
+                                      start:end].view(-1, iso_dim,
+                                                      self.cov_dim)
+
+                start = end
+                end = start + (dipole_dim * self.cov_dim)
+                node_dipoles_cov = cov_raw[:, start:end].view(
+                    -1, dipole_dim, self.cov_dim)
+
+                start = end
+                end = start + (aniso_dim * self.cov_dim)
+                pol_aniso_cov = cov_raw[:, start:end].view(
+                    -1, aniso_dim, self.cov_dim)
+
+                node_polarizability_sh_cov = torch.cat(
+                    (pol_iso_cov, pol_aniso_cov), dim=1)
+
+                node_polarizability_sh_var = torch.sum(
+                    node_polarizability_sh_cov**2, dim=-1)
+
+                total_polarizability_sh_var = scatter_sum(
+                    src=node_polarizability_sh_var,
+                    index=data["batch"],
+                    dim=0,
+                    dim_size=num_graphs,
+                ) + self.eps
+
+                node_polarizability_cov = spherical_to_cartesian(
+                    node_polarizability_sh_cov, self.change_of_basis)
+
+                node_polarizability_var = torch.sum(node_polarizability_cov**2,
+                                                    dim=-1)
+
+                total_polarizability_var = scatter_sum(
+                    src=node_polarizability_var,
+                    index=data["batch"],
+                    dim=0,
+                    dim_size=num_graphs,
+                ) + self.eps
+
+            else:
+                start = end
+                end = start + (dipole_dim * self.cov_dim)
+                node_dipoles_cov = cov_raw[:, start:end].view(
+                    -1, dipole_dim, self.cov_dim)
+
+            atomic_dipoles_var = torch.sum(node_dipoles_cov**2, dim=-1)
+
+            total_dipole_var = scatter_sum(
+                src=atomic_dipoles_var,
+                index=data["batch"],
+                dim=0,
+                dim_size=num_graphs,
+            ) + self.eps
+            atomic_dipoles_var = atomic_dipoles_var + self.eps
+
         output = {
             "charges": atomic_charges,
+            "charges_var": total_charges_var,
             "dipole": total_dipole,
+            "dipole_var": total_dipole_var,
             "atomic_dipoles": atomic_dipoles,
+            "atomic_dipoles_var": atomic_dipoles_var,
             "polarizability": total_polarizability,
+            "polarizability_var": total_polarizability_var,
             "polarizability_sh": total_polarizability_spherical,
+            "polarizability_sh_var": total_polarizability_sh_var,
             "dmu_dr": dmu_dr,
             "dalpha_dr": dalpha_dr,
         }
@@ -1380,6 +1521,13 @@ class EnergyDipolesMACE(torch.nn.Module):
                 dipole_only=False,
                 cov_dim=self.cov_dim)
 
+            self.dipole_cov_readout = NonLinearDipoleReadoutBlock(
+                hidden_irreps_out,
+                MLP_irreps,
+                gate,
+                dipole_only=True,
+                cov_dim=self.cov_dim)
+
     def forward(
             self,
             data: Dict[str, torch.Tensor],
@@ -1496,22 +1644,42 @@ class EnergyDipolesMACE(torch.nn.Module):
         node_energy_var: Optional[torch.Tensor] = None
         energy_cov: Optional[torch.Tensor] = None
         energy_var: Optional[torch.Tensor] = None
+        atomic_dipoles_var: Optional[torch.Tensor] = None
+        total_dipole_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
-            node_energy_cov_logits_raw = self.energy_cov_readout(
-                node_feats_list[-1], 1).view(-1, 1, self.cov_dim)
+            cov_raw = self.dipole_polar_cov_readout(node_feats).squeeze(-1)
+            energies_dim = 1
+            dipole_dim = node_dipoles.shape[1]
+            start = 0
+            end = energies_dim * self.cov_dim
+            node_energy_cov = cov_raw[:,
+                                      start:end].view(-1, energies_dim,
+                                                      self.cov_dim)
 
-            node_energy_cov_logits = node_energy_cov_logits_raw[
-                num_atoms_arange, data["head"][data["batch"]]]
-
-            node_energy_var = torch.sum(node_energy_cov_logits**2,
-                                        dim=-1) + self.eps
-
-            energy_cov = scatter_sum(src=node_energy_cov_logits,
+            energy_cov = scatter_sum(src=node_energy_cov,
                                      index=data["batch"],
                                      dim=0,
                                      dim_size=num_graphs)
 
+            node_energy_var = torch.sum(node_energy_cov**2, dim=-1) + self.eps
+
             energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
+
+            start = end
+            end = start + (dipole_dim * self.cov_dim)
+            node_dipoles_cov = cov_raw[:,
+                                       start:end].view(-1, dipole_dim,
+                                                       self.cov_dim)
+
+            atomic_dipoles_var = torch.sum(node_dipoles_cov**2, dim=-1)
+
+            total_dipole_var = scatter_sum(
+                src=atomic_dipoles_var,
+                index=data["batch"],
+                dim=0,
+                dim_size=num_graphs,
+            ) + self.eps
+            atomic_dipoles_var = atomic_dipoles_var + self.eps
 
         (forces, virials, stress, _, _, forces_var, virials_var, stress_var,
          _) = get_outputs(energy=total_energy,
@@ -1539,6 +1707,8 @@ class EnergyDipolesMACE(torch.nn.Module):
             "stress_var": stress_var,
             "displacement": displacement,
             "dipole": total_dipole,
+            "dipole_var": total_dipole_var,
             "atomic_dipoles": atomic_dipoles,
+            "atomic_dipoles_var": atomic_dipoles_var,
         }
         return output

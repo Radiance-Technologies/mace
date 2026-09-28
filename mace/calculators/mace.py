@@ -195,20 +195,29 @@ class MACECalculator(Calculator):
                 "forces_var",
                 "stress",
                 "stress_var",
+                "virials",
+                "virials_var",
             ])
             if kwargs.get("compute_atomic_stresses", False):
-                self.implemented_properties.extend(["stresses", "virials"])
+                self.implemented_properties.extend([
+                    "atomic_stresses", "atomic_stresses_var", "atomic_virials",
+                    "atomic_virials_var"
+                ])
                 self.compute_atomic_stresses = True
         if model_type in [
                 "EnergyDipoleMACE", "DipoleMACE", "DipolePolarizabilityMACE"
         ]:
-            self.implemented_properties.extend(["dipole", "dipole_var"])
+            self.implemented_properties.extend([
+                "dipole", "dipole_var", "atomic_dipoles", "atomic_dipoles_var"
+            ])
         if model_type == "DipolePolarizabilityMACE":
             self.implemented_properties.extend([
                 "charges",
+                "charges_var",
                 "polarizability",
                 "polarizability_var"
                 "polarizability_sh",
+                "polarizability_sh_var",
             ])
 
         if model_paths is not None:
@@ -243,7 +252,8 @@ class MACECalculator(Calculator):
             if model_type in ["MACE", "EnergyDipoleMACE", "PolarMACE"]:
                 self.implemented_properties.extend([
                     "energy_comm", "energy_comm_var", "forces_comm",
-                    "forces_comm_var", "stress_comm", "stress_comm_var"
+                    "forces_comm_var", "stress_comm", "stress_comm_var",
+                    "virials_comm", "virials_comm_var"
                 ])
             if model_type in [
                     "DipoleMACE",
@@ -252,6 +262,12 @@ class MACECalculator(Calculator):
             ]:
                 self.implemented_properties.extend(
                     ["dipole_comm", "dipole_comm_var"])
+            if model_type == "DipolePolarizabilityMACE":
+                self.implemented_properties.extend([
+                    "charges_comm", "charges_comm_var", "polarizability_comm",
+                    "polarizability_comm_var", "polarizability_sh_comm",
+                    "polarizability_sh_comm_var"
+                ])
 
         for model in self.models:
             model.to(device)
@@ -440,6 +456,7 @@ class MACECalculator(Calculator):
             "polarizability",
             "polarizability_var",
             "polarizability_sh",
+            "polarizability_sh_var",
             "displacement",
             "contributions",
         }
@@ -449,9 +466,13 @@ class MACECalculator(Calculator):
             "forces",
             "forces_var",
             "charges",
+            "charges_var",
             "atomic_stresses",
+            "atomic_stresses_var",
             "atomic_virials",
+            "atomic_virials_var",
             "atomic_dipoles",
+            "atomic_dipoles_var",
             "node_feats",
         }
         sliced: Dict[str, Union[torch.Tensor, None]] = {}
@@ -470,21 +491,27 @@ class MACECalculator(Calculator):
                                out: dict) -> dict:
         tensor_shapes = {
             "energy": [],
-            "node_energy": [num_atoms],
-            "forces": [num_atoms, 3],
-            "stress": [3, 3],
             "energy_var": [],
             "node_energy_var": [num_atoms],
+            "node_energy": [num_atoms],
+            "forces": [num_atoms, 3],
             "forces_var": [num_atoms, 3],
+            "stress": [3, 3],
             "stress_var": [3, 3],
             "atomic_stresses": [num_atoms, 3, 3],
+            "atomic_stresses_var": [num_atoms, 3, 3],
             "atomic_virials": [num_atoms, 3, 3],
+            "atomic_virials_var": [num_atoms, 3, 3],
             "dipole": [3],
             "dipole_var": [3],
+            "atomic_dipoles": [num_atoms, 3],
+            "atomic_dipoles_var": [num_atoms, 3],
             "charges": [num_atoms],
+            "charges_var": [num_atoms],
             "polarizability": [3, 3],
             "polarizability_var": [3, 3],
             "polarizability_sh": [6],
+            "polarizability_sh_var": [6],
         }
         if self.model_type == "PolarMACE":
             tensor_shapes.update({
@@ -661,36 +688,44 @@ class MACECalculator(Calculator):
         # covert from ret_tensors to calculator results dict
         self.results = {}
         scalar_tensors = set(["energy", "energy_var"])
-        results_store_ensemble = set(["energy", "forces", "stress", "dipole"])
+        results_store_ensemble = set([
+            "energy", "forces", "stress", "virials", "dipole", "polarizability"
+        ])
         results_map = [
             ("energy", "energy", self.energy_units_to_eV),
+            ("energy_var", "energy_var", self.energy_units_to_eV),
             ("node_energy", "node_energy", self.energy_units_to_eV),
+            ("node_energy_var", "node_energy_var", self.energy_units_to_eV),
             ("forces", "forces",
+             self.energy_units_to_eV / self.length_units_to_A),
+            ("forces_var", "forces_var",
              self.energy_units_to_eV / self.length_units_to_A),
             ("stress", "stress",
              self.energy_units_to_eV / self.length_units_to_A**3),
-            ("energy_var", "energy_var", self.energy_units_to_eV),
-            ("node_energy_var", "node_energy_var", self.energy_units_to_eV),
-            ("forces_var", "forces_var",
-             self.energy_units_to_eV / self.length_units_to_A),
             ("stress_var", "stress_var",
              self.energy_units_to_eV / self.length_units_to_A**3),
-            (
-                "stresses",
-                "atomic_stresses",
-                self.energy_units_to_eV / self.length_units_to_A**3,
-            ),
-            (
-                "virials",
-                "atomic_virials",
-                self.energy_units_to_eV / self.length_units_to_A**3,
-            ),
+            ("virials", "virials",
+             self.energy_units_to_eV / self.length_units_to_A**3),
+            ("virials_var", "virials_var",
+             self.energy_units_to_eV / self.length_units_to_A**3),
+            ("atomic_stresses", "atomic_stresses",
+             self.energy_units_to_eV / self.length_units_to_A**3),
+            ("atomic_stresses_var", "atomic_stresses_var",
+             self.energy_units_to_eV / self.length_units_to_A**3),
+            ("atomic_virials", "atomic_virials",
+             self.energy_units_to_eV / self.length_units_to_A**3),
+            ("atomic_virials_var", "atomic_virials_var",
+             self.energy_units_to_eV / self.length_units_to_A**3),
             ("dipole", "dipole", 1.0),
             ("dipole_var", "dipole_var", 1.0),
+            ("atomic_dipoles", "atomic_dipoles", 1.0),
+            ("atomic_dipoles_var", "atomic_dipoles_var", 1.0),
             ("charges", "charges", 1.0),
+            ("charges_var", "charges_var", 1.0),
             ("polarizability", "polarizability", 1.0),
             ("polarizability_var", "polarizability_var", 1.0),
             ("polarizability_sh", "polarizability_sh", 1.0),
+            ("polarizability_sh_var", "polarizability_sh_var", 1.0),
         ]
         if self.model_type == "PolarMACE":
             results_map.extend([
@@ -746,10 +781,15 @@ class MACECalculator(Calculator):
         if self.results.get("stress_var") is not None:
             self.results["stress_var"] = full_3x3_to_voigt_6_stress(
                 self.results["stress_var"])
-        if self.results.get("stresses") is not None:
-            self.results["stresses"] = np.asarray([
-                full_3x3_to_voigt_6_stress(stress)
-                for stress in self.results["stresses"]
+        if self.results.get("atomic_stresses") is not None:
+            self.results["atomic_stresses"] = np.asarray([
+                full_3x3_to_voigt_6_stress(atomic_stress)
+                for atomic_stress in self.results["atomic_stresses"]
+            ])
+        if self.results.get("atomic_stresses_var") is not None:
+            self.results["atomic_stresses_var"] = np.asarray([
+                full_3x3_to_voigt_6_stress(atomic_stress_var)
+                for atomic_stress_var in self.results["atomic_stresses_var"]
             ])
 
     def get_dielectric_derivatives(self, atoms=None):

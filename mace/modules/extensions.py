@@ -260,21 +260,28 @@ class MACELES(ScaleShiftMACE):
         energy_cov: Optional[torch.Tensor] = None
         energy_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
-            scale_sq = torch.atleast_1d(self.scale_shift.scale)
-            node_energy_cov_logits_raw = self.energy_cov_readout(
+            node_energy_cov_raw = self.energy_cov_readout(
                 node_feats_list[-1], node_heads).view(-1, len(self.heads),
                                                       self.cov_dim)
 
-            node_energy_cov_logits = node_energy_cov_logits_raw[
-                num_atoms_arange, node_heads] * scale_sq
+            unscaled_node_energy_cov = node_energy_cov_raw[num_atoms_arange,
+                                                           node_heads]
 
-            node_energy_var = torch.sum(node_energy_cov_logits**2,
-                                        dim=-1) + self.eps
+            unscaled_energy_cov = scatter_sum(src=unscaled_node_energy_cov,
+                                              index=data["batch"],
+                                              dim=0,
+                                              dim_size=num_graphs)
 
-            energy_cov = scatter_sum(src=node_energy_cov_logits,
+            scale = torch.atleast_1d(self.scale_shift.scale)[node_heads]
+
+            node_energy_cov = unscaled_node_energy_cov * scale
+
+            energy_cov = scatter_sum(src=node_energy_cov,
                                      index=data["batch"],
                                      dim=0,
                                      dim_size=num_graphs)
+
+            node_energy_var = torch.sum(node_energy_cov**2, dim=-1) + self.eps
 
             energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
 
@@ -292,19 +299,23 @@ class MACELES(ScaleShiftMACE):
              compute_hessian=compute_hessian,
              compute_edge_forces=compute_edge_forces,
              energy_cov=energy_cov,
+             energy_cov_weight=unscaled_energy_cov,
              eps=self.eps)
 
         atomic_virials: Optional[torch.Tensor] = None
         atomic_stresses: Optional[torch.Tensor] = None
         if compute_atomic_stresses and edge_forces is not None:
-            atomic_virials, atomic_stresses = get_atomic_virials_stresses(
-                edge_forces=edge_forces,
-                edge_index=data["edge_index"],
-                vectors=vectors,
-                num_atoms=positions.shape[0],
-                batch=data["batch"],
-                cell=cell,
-            )
+            (atomic_virials, atomic_stresses, atomic_virials_var,
+             atomic_stresses_var) = get_atomic_virials_stresses(
+                 edge_forces=edge_forces,
+                 edge_index=data["edge_index"],
+                 vectors=vectors,
+                 num_atoms=positions.shape[0],
+                 batch=data["batch"],
+                 cell=cell,
+                 edge_forces_var=edge_forces_var,
+                 eps=self.eps,
+             )
 
         return {
             "energy": total_energy,
@@ -320,7 +331,9 @@ class MACELES(ScaleShiftMACE):
             "stress": stress,
             "stress_var": stress_var,
             "atomic_virials": atomic_virials,
+            "atomic_virials_var": atomic_virials_var,
             "atomic_stresses": atomic_stresses,
+            "atomic_stresses_var": atomic_stresses_var,
             "displacement": displacement,
             "hessian": hessian,
             "node_feats": node_feats_out,
@@ -957,21 +970,27 @@ class PolarMACE(ScaleShiftMACE):
         energy_cov: Optional[torch.Tensor] = None
         energy_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
-            scale_sq = torch.atleast_1d(self.scale_shift.scale)
-            node_energy_cov_logits_raw = self.energy_cov_readout(
-                features_mixed, node_heads).view(-1, len(self.heads),
-                                                 self.cov_dim)
+            node_energy_cov_raw = self.energy_cov_readout(
+                node_feats, node_heads).view(-1, len(self.heads), self.cov_dim)
 
-            node_energy_cov_logits = node_energy_cov_logits_raw[
-                num_atoms_arange, node_heads] * scale_sq
+            unscaled_node_energy_cov = node_energy_cov_raw[num_atoms_arange,
+                                                           node_heads]
 
-            node_energy_var = torch.sum(node_energy_cov_logits**2,
-                                        dim=-1) + self.eps
+            unscaled_energy_cov = scatter_sum(src=unscaled_node_energy_cov,
+                                              index=data["batch"],
+                                              dim=0,
+                                              dim_size=num_graphs)
 
-            energy_cov = scatter_sum(src=node_energy_cov_logits,
+            scale = torch.atleast_1d(self.scale_shift.scale)[node_heads]
+
+            node_energy_cov = unscaled_node_energy_cov * scale
+
+            energy_cov = scatter_sum(src=node_energy_cov,
                                      index=data["batch"],
                                      dim=0,
                                      dim_size=num_graphs)
+
+            node_energy_var = torch.sum(node_energy_cov**2, dim=-1) + self.eps
 
             energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
 
@@ -990,21 +1009,23 @@ class PolarMACE(ScaleShiftMACE):
              compute_edge_forces=(compute_edge_forces
                                   or compute_atomic_stresses),
              energy_cov=energy_cov,
+             energy_cov_weight=unscaled_energy_cov,
              eps=self.eps)
 
         atomic_virials: Optional[torch.Tensor] = None
         atomic_stresses: Optional[torch.Tensor] = None
         if compute_atomic_stresses and edge_forces is not None:
-            from .utils import get_atomic_virials_stresses as _gav
-
-            atomic_virials, atomic_stresses = _gav(
-                edge_forces=edge_forces,
-                edge_index=data["edge_index"],
-                vectors=vectors,
-                num_atoms=positions.shape[0],
-                batch=data["batch"],
-                cell=cell,
-            )
+            (atomic_virials, atomic_stresses, atomic_virials_var,
+             atomic_stresses_var) = get_atomic_virials_stresses(
+                 edge_forces=edge_forces,
+                 edge_index=data["edge_index"],
+                 vectors=vectors,
+                 num_atoms=positions.shape[0],
+                 batch=data["batch"],
+                 cell=cell,
+                 edge_forces_var=edge_forces_var,
+                 eps=self.eps,
+             )
 
         return {
             "energy":
@@ -1035,8 +1056,12 @@ class PolarMACE(ScaleShiftMACE):
             stress_var,
             "atomic_virials":
             atomic_virials,
+            "atomic_virials_var":
+            atomic_virials_var,
             "atomic_stresses":
             atomic_stresses,
+            "atomic_stresses_var":
+            atomic_stresses_var,
             "hessian":
             hessian,
             "displacement":

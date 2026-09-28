@@ -753,11 +753,12 @@ class MACELoss(Metric):
         loss = self.loss_fn(pred=output, ref=batch)
         self.total_loss += loss
         self.num_data += batch.num_graphs
+        num_atoms = batch.ptr[1:] - batch.ptr[:-1]
 
         if output.get("energy") is not None and batch.energy is not None:
             self.delta_es.append(batch.energy - output["energy"])
-            self.delta_es_per_atom.append((batch.energy - output["energy"]) /
-                                          (batch.ptr[1:] - batch.ptr[:-1]))
+            self.delta_es_per_atom.append(
+                (batch.energy - output["energy"]) / num_atoms)
             self.E_computed += filter_nonzero_weight(batch, self.delta_es,
                                                      batch.weight,
                                                      batch.energy_weight)
@@ -765,8 +766,7 @@ class MACELoss(Metric):
         if output.get("energy_var") is not None:
             var = output["energy_var"].detach()
             self.energy_var.append(var)
-            self.energy_var_per_atom.append(var /
-                                            (batch.ptr[1:] - batch.ptr[:-1]))
+            self.energy_var_per_atom.append(var / num_atoms**2)
             self.energy_uncertainty_computed += filter_nonzero_weight(
                 batch,
                 self.energy_var,
@@ -812,16 +812,15 @@ class MACELoss(Metric):
         if output.get("virials") is not None and batch.virials is not None:
             self.delta_virials.append(batch.virials - output["virials"])
             self.delta_virials_per_atom.append(
-                (batch.virials - output["virials"]) /
-                (batch.ptr[1:] - batch.ptr[:-1]).view(-1, 1, 1))
+                (batch.virials - output["virials"]) / num_atoms.view(-1, 1, 1))
             self.virials_computed += filter_nonzero_weight(
                 batch, self.delta_virials, batch.weight, batch.virials_weight)
 
         if output.get("virials_var") is not None:
             var = output["virials_var"].detach()
             self.virials_var.append(var)
-            self.virials_var_per_atom.append(
-                var / (batch.ptr[1:] - batch.ptr[:-1]).view(-1, 1, 1))
+            self.virials_var_per_atom.append(var /
+                                             (num_atoms**2).view(-1, 1, 1))
 
             self.virials_uncertainty_computed += filter_nonzero_weight(
                 batch,
@@ -834,8 +833,7 @@ class MACELoss(Metric):
             self.mus.append(batch.dipole)
             self.delta_mus.append(batch.dipole - output["dipole"])
             self.delta_mus_per_atom.append(
-                (batch.dipole - output["dipole"]) /
-                (batch.ptr[1:] - batch.ptr[:-1]).unsqueeze(-1))
+                (batch.dipole - output["dipole"]) / (num_atoms).unsqueeze(-1))
             self.Mus_computed += filter_nonzero_weight(
                 batch,
                 self.delta_mus,
@@ -850,7 +848,7 @@ class MACELoss(Metric):
                                              output["polarizability"])
             self.delta_polarizability_per_atom.append(
                 (batch.polarizability - output["polarizability"]) /
-                (batch.ptr[1:] - batch.ptr[:-1]).unsqueeze(-1).unsqueeze(-1))
+                (num_atoms).unsqueeze(-1).unsqueeze(-1))
             self.polarizability_computed += filter_nonzero_weight(
                 batch,
                 self.delta_polarizability,

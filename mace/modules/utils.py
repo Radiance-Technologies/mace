@@ -24,6 +24,7 @@ def compute_forces(
     positions: torch.Tensor,
     training: bool = True,
     energy_cov: Optional[torch.Tensor] = None,
+    energy_cov_weight: Optional[torch.Tensor] = None,
     eps: float = 1e-6,
 ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
     grad_outputs = [torch.ones_like(energy)]
@@ -32,7 +33,10 @@ def compute_forces(
                           training)
     forces = -grad_ef if grad_ef is not None else torch.zeros_like(positions)
     if energy_cov is not None:
-        grad_cf, _ = get_grad([energy_cov], [positions], [energy_cov],
+        if energy_cov_weight is None:
+            energy_cov_weight = energy_cov
+
+        grad_cf, _ = get_grad([energy_cov], [positions], [energy_cov_weight],
                               training, training)
         forces_var = (4.0 * grad_cf.square() + eps if grad_cf is not None else
                       torch.full_like(positions, eps))
@@ -49,6 +53,7 @@ def compute_forces_virials(
     training: bool = True,
     compute_stress: bool = False,
     energy_cov: Optional[torch.Tensor] = None,
+    energy_cov_weight: Optional[torch.Tensor] = None,
     eps: float = 1e-6,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, Optional[torch.Tensor],
            Optional[torch.Tensor], Optional[torch.Tensor]]:
@@ -62,8 +67,10 @@ def compute_forces_virials(
         displacement)
 
     if energy_cov is not None:
+        if energy_cov_weight is None:
+            energy_cov_weight = energy_cov
         grad_cf, grad_cv = get_grad([energy_cov], [positions, displacement],
-                                    [energy_cov], training, training)
+                                    [energy_cov_weight], training, training)
         forces_var = (4.0 * grad_cf.square() + eps if grad_cf is not None else
                       torch.full_like(positions, eps))
         virials_var = (4.0 * grad_cv.square() if grad_cv is not None else
@@ -221,6 +228,7 @@ def get_outputs(
     compute_hessian: bool = False,
     compute_edge_forces: bool = False,
     energy_cov: Optional[torch.Tensor] = None,
+    energy_cov_weight: Optional[torch.Tensor] = None,
     eps: float = 1e-6,
 ) -> Tuple[
         Optional[torch.Tensor],
@@ -242,6 +250,7 @@ def get_outputs(
             compute_stress=compute_stress,
             training=(training or compute_hessian or compute_edge_forces),
             energy_cov=energy_cov,
+            energy_cov_weight=energy_cov_weight,
             eps=eps,
         )
     elif compute_force:
@@ -250,6 +259,7 @@ def get_outputs(
             positions=positions,
             training=(training or compute_hessian or compute_edge_forces),
             energy_cov=energy_cov,
+            energy_cov_weight=energy_cov_weight,
             eps=eps,
         )
         virials = stress = virials_var = stress_var = None
@@ -267,6 +277,7 @@ def get_outputs(
             positions=vectors,
             training=(training or compute_hessian),
             energy_cov=energy_cov,
+            energy_cov_weight=energy_cov_weight,
             eps=eps,
         )
         if edge_forces is not None:
@@ -278,13 +289,16 @@ def get_outputs(
 
 
 def get_atomic_virials_stresses(
-        edge_forces: torch.Tensor,  # [n_edges, 3]
-        edge_index: torch.Tensor,  # [2, n_edges]
-        vectors: torch.Tensor,  # [n_edges, 3]
-        num_atoms: int,
-        batch: torch.Tensor,
-        cell: torch.Tensor,  # [n_graphs, 3, 3]
-) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    edge_forces: torch.Tensor,  # [n_edges, 3]
+    edge_index: torch.Tensor,  # [2, n_edges]
+    vectors: torch.Tensor,  # [n_edges, 3]
+    num_atoms: int,
+    batch: torch.Tensor,
+    cell: torch.Tensor,  # [n_graphs, 3, 3]
+    edge_forces_var: Optional[torch.Tensor] = None,
+    eps: float = 1e-6,
+) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor],
+           Optional[torch.Tensor]]:
     """
     Compute atomic virials and optionally atomic stresses from edge forces and vectors.
     From pobo95 PR #528.
@@ -304,7 +318,7 @@ def get_atomic_virials_stresses(
                                        dim_size=num_atoms)
     atom_virial = (atom_virial_sender + atom_virial_receiver) / 2
     atom_virial = (atom_virial + atom_virial.transpose(-1, -2)) / 2
-    atom_stress = None
+
     cell = cell.view(-1, 3, 3)
     volume = torch.linalg.det(cell).abs().unsqueeze(-1)
     atom_volume = volume[batch].view(-1, 1, 1)
@@ -312,7 +326,34 @@ def get_atomic_virials_stresses(
     atom_stress = torch.where(
         torch.abs(atom_stress) < 1e10, atom_stress,
         torch.zeros_like(atom_stress))
-    return -1 * atom_virial, atom_stress
+
+    if edge_forces_var is not None:
+        edge_virial_var = torch.einsum("zi,zj->zij", edge_forces_var,
+                                       vectors**2)
+
+        # Var(0.5 * (A + B)) = 0.25 * (Var(A) + Var(B))
+        atom_virial_var_sender = scatter_sum(src=edge_virial_var,
+                                             index=edge_index[0],
+                                             dim=0,
+                                             dim_size=num_atoms)
+        atom_virial_var_receiver = scatter_sum(src=edge_virial_var,
+                                               index=edge_index[1],
+                                               dim=0,
+                                               dim_size=num_atoms)
+        atom_virial_var = 0.25 * (atom_virial_var_sender +
+                                  atom_virial_var_receiver)
+
+        # Symmetrization variance: Var(0.5 * (A_ij + A_ji)) = 0.25 * (Var(A_ij) + Var(A_ji))
+        atom_virial_var = 0.25 * (atom_virial_var +
+                                  atom_virial_var.transpose(-1, -2))
+
+        atom_stress_var = atom_virial_var / (atom_volume**2) + eps
+        atom_virial_var += eps
+    else:
+        atom_virial_var = None
+        atom_stress_var = None
+
+    return -1 * atom_virial, atom_stress, atom_virial_var, atom_stress_var
 
 
 def get_edge_vectors_and_lengths(

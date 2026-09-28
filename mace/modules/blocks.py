@@ -276,29 +276,28 @@ class LinearDipolePolarReadoutBlock(torch.nn.Module):
 class NonLinearDipolePolarReadoutBlock(torch.nn.Module):
 
     def __init__(
-            self,
-            irreps_in: o3.Irreps,
-            MLP_irreps: o3.Irreps,
-            gate: Callable,
-            use_polarizability: bool = True,
-            irrep_out: Optional[o3.Irreps] = None,
-            cueq_config: Optional[CuEquivarianceConfig] = None,
-            oeq_config: Optional[OEQConfig] = None,  # pylint: disable=unused-argument
+        self,
+        irreps_in: o3.Irreps,
+        MLP_irreps: o3.Irreps,
+        gate: Callable,
+        use_polarizability: bool = True,
+        cueq_config: Optional[CuEquivarianceConfig] = None,
+        oeq_config: Optional[OEQConfig] = None,  # pylint: disable=unused-argument
+        cov_dim: Optional[int] = None,
     ):
         super().__init__()
         self.hidden_irreps = MLP_irreps
         if use_polarizability:
             print("You will calculate the polarizability and dipole.")
-            if self.irrep_out is None:
-                self.irreps_out = o3.Irreps("2x0e + 1x1o + 1x2e")
-            else:
-                o3.Irreps(irrep_out)
+            self.irreps_out = o3.Irreps("2x0e + 1x1o + 1x2e")
         else:
             raise ValueError(
                 "Invalid configuration for NonLinearDipolePolarReadoutBlock: "
                 "use_polarizability must be either True."
                 "If you want to calculate only the dipole, use AtomicDipolesMACE."
             )
+        if cov_dim is not None:
+            self.irreps_out = (cov_dim * self.irreps_out).simplify()
         irreps_scalars = o3.Irreps([(mul, ir) for mul, ir in MLP_irreps
                                     if ir.l == 0 and ir in self.irreps_out])
         irreps_gated = o3.Irreps([(mul, ir) for mul, ir in MLP_irreps
