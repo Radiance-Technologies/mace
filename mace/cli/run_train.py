@@ -82,10 +82,8 @@ def main() -> None:
     """
     This script runs the training/fine tuning for mace
     """
-
-    # ClearML automatically reads CLEARML_PARENT_TASK_ID from the environment
-    task = Task.init(project_name="MICA", task_name="MACE")
     args = tools.build_default_arg_parser().parse_args()
+    task = Task.init(project_name="MICA", task_name=args.name)
     run(args)
 
 
