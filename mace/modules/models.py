@@ -627,6 +627,7 @@ class ScaleShiftMACE(MACE):
 
         node_energy_var: Optional[torch.Tensor] = None
         energy_cov: Optional[torch.Tensor] = None
+        unscaled_energy_cov: Optional[torch.Tensor] = None
         energy_var: Optional[torch.Tensor] = None
         if self.compute_uncertainty:
             node_energy_cov_raw = self.energy_cov_readout(
@@ -642,7 +643,7 @@ class ScaleShiftMACE(MACE):
 
             scale = torch.atleast_1d(self.scale_shift.scale)[node_heads]
 
-            node_energy_cov = unscaled_node_energy_cov * scale
+            node_energy_cov = unscaled_node_energy_cov * scale.unsqueeze(-1)
 
             energy_cov = scatter_sum(src=node_energy_cov,
                                      index=data["batch"],
