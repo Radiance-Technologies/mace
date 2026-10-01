@@ -692,63 +692,56 @@ class MACECalculator(Calculator):
             "energy", "forces", "stress", "virials", "dipole", "polarizability"
         ])
         results_map = [
-            ("energy", "energy", self.energy_units_to_eV),
-            ("energy_var", "energy_var", self.energy_units_to_eV),
-            ("node_energy", "node_energy", self.energy_units_to_eV),
-            ("node_energy_var", "node_energy_var", self.energy_units_to_eV),
-            ("forces", "forces",
-             self.energy_units_to_eV / self.length_units_to_A),
-            ("forces_var", "forces_var",
-             self.energy_units_to_eV / self.length_units_to_A),
-            ("stress", "stress",
+            ("energy", self.energy_units_to_eV),
+            ("energy_var", self.energy_units_to_eV),
+            ("node_energy", self.energy_units_to_eV),
+            ("node_energy_var", self.energy_units_to_eV),
+            ("forces", self.energy_units_to_eV / self.length_units_to_A),
+            ("forces_var", self.energy_units_to_eV / self.length_units_to_A),
+            ("stress", self.energy_units_to_eV / self.length_units_to_A**3),
+            ("stress_var",
              self.energy_units_to_eV / self.length_units_to_A**3),
-            ("stress_var", "stress_var",
+            ("virials", self.energy_units_to_eV / self.length_units_to_A**3),
+            ("virials_var",
              self.energy_units_to_eV / self.length_units_to_A**3),
-            ("virials", "virials",
+            ("atomic_stresses",
              self.energy_units_to_eV / self.length_units_to_A**3),
-            ("virials_var", "virials_var",
+            ("atomic_stresses_var",
              self.energy_units_to_eV / self.length_units_to_A**3),
-            ("atomic_stresses", "atomic_stresses",
+            ("atomic_virials",
              self.energy_units_to_eV / self.length_units_to_A**3),
-            ("atomic_stresses_var", "atomic_stresses_var",
+            ("atomic_virials_var",
              self.energy_units_to_eV / self.length_units_to_A**3),
-            ("atomic_virials", "atomic_virials",
-             self.energy_units_to_eV / self.length_units_to_A**3),
-            ("atomic_virials_var", "atomic_virials_var",
-             self.energy_units_to_eV / self.length_units_to_A**3),
-            ("dipole", "dipole", 1.0),
-            ("dipole_var", "dipole_var", 1.0),
-            ("atomic_dipoles", "atomic_dipoles", 1.0),
-            ("atomic_dipoles_var", "atomic_dipoles_var", 1.0),
-            ("charges", "charges", 1.0),
-            ("charges_var", "charges_var", 1.0),
-            ("polarizability", "polarizability", 1.0),
-            ("polarizability_var", "polarizability_var", 1.0),
-            ("polarizability_sh", "polarizability_sh", 1.0),
-            ("polarizability_sh_var", "polarizability_sh_var", 1.0),
+            ("dipole", 1.0),
+            ("dipole_var", 1.0),
+            ("atomic_dipoles", 1.0),
+            ("atomic_dipoles_var", 1.0),
+            ("charges", 1.0),
+            ("charges_var", 1.0),
+            ("polarizability", 1.0),
+            ("polarizability_var", 1.0),
+            ("polarizability_sh", 1.0),
+            ("polarizability_sh_var", 1.0),
         ]
         if self.model_type == "PolarMACE":
             results_map.extend([
                 (
                     "interaction_energy",
-                    "interaction_energy",
                     self.energy_units_to_eV,
                 ),
                 (
                     "electrostatic_energy",
-                    "electrostatic_energy",
                     self.energy_units_to_eV,
                 ),
-                ("electron_energy", "electron_energy",
-                 self.energy_units_to_eV),
-                ("spins", "spins", 1.0),
-                ("density_coefficients", "density_coefficients", 1.0),
-                ("spin_charge_density", "spin_charge_density", 1.0),
+                ("electron_energy", self.energy_units_to_eV),
+                ("spins", 1.0),
+                ("density_coefficients", 1.0),
+                ("spin_charge_density", 1.0),
             ])
-        for results_key, ret_key, unit_conv in results_map:
-            if ret_tensors.get(ret_key) is not None:
-                data = torch.mean(ret_tensors[ret_key], dim=0).cpu()
-                if ret_key in scalar_tensors:
+        for results_key, unit_conv in results_map:
+            if ret_tensors.get(results_key) is not None:
+                data = torch.mean(ret_tensors[results_key], dim=0).cpu()
+                if results_key in scalar_tensors:
                     data = data.item()
                 else:
                     data = data.numpy()
@@ -762,11 +755,11 @@ class MACECalculator(Calculator):
                     data = torch.var(ret_tensors[results_key],
                                      dim=0,
                                      unbiased=False).cpu()
-                    if ret_key in scalar_tensors:
+                    if results_key in scalar_tensors:
                         data = data.item()
                     else:
                         data = data.numpy()
-                    data *= unit_conv
+                    data *= unit_conv**2
                     self.results[results_key + "_comm_var"] = data
 
         # special cases

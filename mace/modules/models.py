@@ -451,6 +451,8 @@ class MACE(torch.nn.Module):
 
         atomic_virials: Optional[torch.Tensor] = None
         atomic_stresses: Optional[torch.Tensor] = None
+        atomic_virials_var: Optional[torch.Tensor] = None
+        atomic_stresses_var: Optional[torch.Tensor] = None
         if compute_atomic_stresses and edge_forces is not None:
             (atomic_virials, atomic_stresses, atomic_virials_var,
              atomic_stresses_var) = get_atomic_virials_stresses(
@@ -674,6 +676,8 @@ class ScaleShiftMACE(MACE):
 
         atomic_virials: Optional[torch.Tensor] = None
         atomic_stresses: Optional[torch.Tensor] = None
+        atomic_virials_var: Optional[torch.Tensor] = None
+        atomic_stresses_var: Optional[torch.Tensor] = None
         if compute_atomic_stresses and edge_forces is not None:
             (atomic_virials, atomic_stresses, atomic_virials_var,
              atomic_stresses_var) = get_atomic_virials_stresses(
