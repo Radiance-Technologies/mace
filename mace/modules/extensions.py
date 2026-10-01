@@ -264,17 +264,10 @@ class MACELES(ScaleShiftMACE):
                 node_feats_list[-1], node_heads).view(-1, len(self.heads),
                                                       self.cov_dim)
 
-            unscaled_node_energy_cov = node_energy_cov_raw[num_atoms_arange,
-                                                           node_heads]
-
-            unscaled_energy_cov = scatter_sum(src=unscaled_node_energy_cov,
-                                              index=data["batch"],
-                                              dim=0,
-                                              dim_size=num_graphs)
-
             scale = torch.atleast_1d(self.scale_shift.scale)[node_heads]
 
-            node_energy_cov = unscaled_node_energy_cov * scale
+            node_energy_cov = node_energy_cov_raw[
+                num_atoms_arange, node_heads] * scale.unsqueeze(-1)
 
             energy_cov = scatter_sum(src=node_energy_cov,
                                      index=data["batch"],
@@ -299,7 +292,6 @@ class MACELES(ScaleShiftMACE):
              compute_hessian=compute_hessian,
              compute_edge_forces=compute_edge_forces,
              energy_cov=energy_cov,
-             energy_cov_weight=unscaled_energy_cov,
              eps=self.eps)
 
         atomic_virials: Optional[torch.Tensor] = None
@@ -975,17 +967,10 @@ class PolarMACE(ScaleShiftMACE):
             node_energy_cov_raw = self.energy_cov_readout(
                 node_feats, node_heads).view(-1, len(self.heads), self.cov_dim)
 
-            unscaled_node_energy_cov = node_energy_cov_raw[num_atoms_arange,
-                                                           node_heads]
-
-            unscaled_energy_cov = scatter_sum(src=unscaled_node_energy_cov,
-                                              index=data["batch"],
-                                              dim=0,
-                                              dim_size=num_graphs)
-
             scale = torch.atleast_1d(self.scale_shift.scale)[node_heads]
 
-            node_energy_cov = unscaled_node_energy_cov * scale
+            node_energy_cov = node_energy_cov_raw[
+                num_atoms_arange, node_heads] * scale.unsqueeze(-1)
 
             energy_cov = scatter_sum(src=node_energy_cov,
                                      index=data["batch"],
@@ -1011,7 +996,6 @@ class PolarMACE(ScaleShiftMACE):
              compute_edge_forces=(compute_edge_forces
                                   or compute_atomic_stresses),
              energy_cov=energy_cov,
-             energy_cov_weight=unscaled_energy_cov,
              eps=self.eps)
 
         atomic_virials: Optional[torch.Tensor] = None

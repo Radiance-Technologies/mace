@@ -5,7 +5,7 @@
 ###########################################################################################
 
 import logging
-from typing import Dict, List, NamedTuple, Optional, Tuple
+from typing import Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
 import torch
@@ -24,22 +24,26 @@ def compute_forces(
     positions: torch.Tensor,
     training: bool = True,
     energy_cov: Optional[torch.Tensor] = None,
-    energy_cov_weight: Optional[torch.Tensor] = None,
     eps: float = 1e-6,
 ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
     grad_outputs = [torch.ones_like(energy)]
-    retain_graph = True if energy_cov is not None else training
+    retain_graph = training or (energy_cov is not None)
     grad_ef, _ = get_grad([energy], [positions], grad_outputs, retain_graph,
                           training)
     forces = -grad_ef if grad_ef is not None else torch.zeros_like(positions)
     if energy_cov is not None:
-        if energy_cov_weight is None:
-            energy_cov_weight = energy_cov
-
-        grad_cf, _ = get_grad([energy_cov], [positions], [energy_cov_weight],
-                              training, training)
-        forces_var = (4.0 * grad_cf.square() + eps if grad_cf is not None else
-                      torch.full_like(positions, eps))
+        grads_cf = []
+        num_components = energy_cov.shape[-1]
+        for k in range(num_components):
+            retain_graph = training or (k < num_components - 1)
+            outputs = [energy_cov[..., k]]
+            grad_outputs = [torch.ones_like(energy_cov[..., k])]
+            grad_cf, _ = get_grad(outputs, [positions], grad_outputs,
+                                  retain_graph, training)
+            grads_cf.append(grad_cf if grad_cf is not None else torch.
+                            zeros_like(positions))
+        forces_var = (torch.stack(grads_cf, dim=0)**2).sum(dim=0)
+        forces_var = forces_var + eps
     else:
         forces_var = None
     return forces, forces_var
@@ -53,13 +57,12 @@ def compute_forces_virials(
     training: bool = True,
     compute_stress: bool = False,
     energy_cov: Optional[torch.Tensor] = None,
-    energy_cov_weight: Optional[torch.Tensor] = None,
     eps: float = 1e-6,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, Optional[torch.Tensor],
            Optional[torch.Tensor], Optional[torch.Tensor]]:
 
     grad_outputs = [torch.ones_like(energy)]
-    retain_graph = True if energy_cov is not None else training
+    retain_graph = training or (energy_cov is not None)
     grad_ef, grad_ev = get_grad([energy], [positions, displacement],
                                 grad_outputs, retain_graph, training)
     forces = -grad_ef if grad_ef is not None else torch.zeros_like(positions)
@@ -67,27 +70,36 @@ def compute_forces_virials(
         displacement)
 
     if energy_cov is not None:
-        if energy_cov_weight is None:
-            energy_cov_weight = energy_cov
-        grad_cf, grad_cv = get_grad([energy_cov], [positions, displacement],
-                                    [energy_cov_weight], training, training)
-        forces_var = (4.0 * grad_cf.square() + eps if grad_cf is not None else
-                      torch.full_like(positions, eps))
-        virials_var = (4.0 * grad_cv.square() if grad_cv is not None else
-                       torch.full_like(displacement, eps))
+        grads_cf = []
+        grads_cv = []
+        num_components = energy_cov.shape[-1]
+        for k in range(num_components):
+            retain_graph = training or (k < num_components - 1)
+            outputs = [energy_cov[..., k]]
+            grad_outputs = [torch.ones_like(energy_cov[..., k])]
+            grad_cf, grad_cv = get_grad(outputs, [positions, displacement],
+                                        grad_outputs, retain_graph, training)
+            grads_cf.append(grad_cf if grad_cf is not None else torch.
+                            zeros_like(positions))
+            grads_cv.append(grad_cv if grad_cv is not None else torch.
+                            zeros_like(displacement))
+        forces_var = (torch.stack(grads_cf, dim=0)**2).sum(dim=0)
+        forces_var = forces_var + eps
+        virials_var = (torch.stack(grads_cv, dim=0)**2).sum(dim=0)
     else:
-        grad_cv = forces_var = virials_var = None
+        forces_var = virials_var = None
 
-    stress = torch.zeros_like(displacement)
-    if compute_stress and (grad_ev is not None or grad_cv is not None):
+    if compute_stress and (grad_ev is not None or virials_var is not None):
         volume = torch.linalg.det(cell.view(-1, 3, 3)).abs().view(-1, 1, 1)
         if grad_ev is not None:
             raw_stress = grad_ev / volume
             stress = torch.where(
                 torch.abs(raw_stress) < 1e10, raw_stress,
                 torch.zeros_like(raw_stress))
-        if grad_cv is not None:
-            stress_var = virials_var / volume.square() + eps
+        else:
+            stress = torch.zeros_like(displacement)
+        if virials_var is not None:
+            stress_var = virials_var / volume**2 + eps
         elif energy_cov is not None:
             stress_var = torch.full_like(displacement, eps)
         else:
@@ -228,7 +240,6 @@ def get_outputs(
     compute_hessian: bool = False,
     compute_edge_forces: bool = False,
     energy_cov: Optional[torch.Tensor] = None,
-    energy_cov_weight: Optional[torch.Tensor] = None,
     eps: float = 1e-6,
 ) -> Tuple[
         Optional[torch.Tensor],
@@ -250,7 +261,6 @@ def get_outputs(
             compute_stress=compute_stress,
             training=(training or compute_hessian or compute_edge_forces),
             energy_cov=energy_cov,
-            energy_cov_weight=energy_cov_weight,
             eps=eps,
         )
     elif compute_force:
@@ -259,7 +269,6 @@ def get_outputs(
             positions=positions,
             training=(training or compute_hessian or compute_edge_forces),
             energy_cov=energy_cov,
-            energy_cov_weight=energy_cov_weight,
             eps=eps,
         )
         virials = stress = virials_var = stress_var = None
@@ -277,7 +286,6 @@ def get_outputs(
             positions=vectors,
             training=(training or compute_hessian),
             energy_cov=energy_cov,
-            energy_cov_weight=energy_cov_weight,
             eps=eps,
         )
         if edge_forces is not None:
