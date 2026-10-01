@@ -83,8 +83,8 @@ def main() -> None:
     This script runs the training/fine tuning for mace
     """
     args = tools.build_default_arg_parser().parse_args()
-    task = Task.init(project_name="MICA",
-                     task_name=args.name.replace("_", " "))
+    formatted_name = args.name.replace("_", " ")
+    task = Task.init(project_name="MICA", task_name=formatted_name)
     run(args)
 
 
