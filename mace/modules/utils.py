@@ -19,7 +19,8 @@ from mace.tools.torch_geometric.batch import Batch
 from .blocks import AtomicEnergiesBlock
 
 
-def compute_forces(
+@torch.jit.unused
+def compute_forces_vmap(
     energy: torch.Tensor,
     positions: torch.Tensor,
     training: bool = True,
@@ -32,24 +33,33 @@ def compute_forces(
                           training)
     forces = -grad_ef if grad_ef is not None else torch.zeros_like(positions)
     if energy_cov is not None:
-        grads_cf = []
-        num_components = energy_cov.shape[-1]
-        for k in range(num_components):
-            retain_graph = training or (k < num_components - 1)
-            outputs = [energy_cov[..., k]]
-            grad_outputs = [torch.ones_like(energy_cov[..., k])]
-            grad_cf, _ = get_grad(outputs, [positions], grad_outputs,
-                                  retain_graph, training)
-            grads_cf.append(grad_cf if grad_cf is not None else torch.
-                            zeros_like(positions))
-        forces_var = (torch.stack(grads_cf, dim=0)**2).sum(dim=0)
-        forces_var = forces_var + eps
+        energy_cov_flatten = energy_cov.view(-1)
+        num_components = energy_cov_flatten.shape[0]
+
+        def get_vjp(v: torch.Tensor) -> torch.Tensor:
+            grad_cf, _ = get_grad([energy_cov_flatten], [positions], [v], True,
+                                  training)
+            g_pos = grad_cf if grad_cf is not None else torch.zeros_like(
+                positions)
+            return g_pos
+
+        I_N = torch.eye(num_components).to(energy_cov.device)
+        chunk_size = 1 if num_components < 64 else 16
+        try:
+            grads_cf = torch.vmap(get_vjp,
+                                  in_dims=0,
+                                  out_dims=0,
+                                  chunk_size=chunk_size)(I_N)**2
+        except RuntimeError:
+            grads_cf = compute_forces_loop(positions, training, energy_cov)
+        forces_var = grads_cf.sum(dim=0) + eps
     else:
         forces_var = None
     return forces, forces_var
 
 
-def compute_forces_virials(
+@torch.jit.unused
+def compute_forces_virials_vmap(
     energy: torch.Tensor,
     positions: torch.Tensor,
     displacement: torch.Tensor,
@@ -70,22 +80,33 @@ def compute_forces_virials(
         displacement)
 
     if energy_cov is not None:
-        grads_cf = []
-        grads_cv = []
-        num_components = energy_cov.shape[-1]
-        for k in range(num_components):
-            retain_graph = training or (k < num_components - 1)
-            outputs = [energy_cov[..., k]]
-            grad_outputs = [torch.ones_like(energy_cov[..., k])]
-            grad_cf, grad_cv = get_grad(outputs, [positions, displacement],
-                                        grad_outputs, retain_graph, training)
-            grads_cf.append(grad_cf if grad_cf is not None else torch.
-                            zeros_like(positions))
-            grads_cv.append(grad_cv if grad_cv is not None else torch.
-                            zeros_like(displacement))
-        forces_var = (torch.stack(grads_cf, dim=0)**2).sum(dim=0)
-        forces_var = forces_var + eps
-        virials_var = (torch.stack(grads_cv, dim=0)**2).sum(dim=0)
+        energy_cov_flatten = energy_cov.view(-1)
+        num_components = energy_cov_flatten.shape[0]
+
+        def get_vjp(v: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+            grad_cf, grad_cv = get_grad([energy_cov_flatten],
+                                        [positions, displacement], [v], True,
+                                        training)
+            g_pos = grad_cf if grad_cf is not None else torch.zeros_like(
+                positions)
+            g_disp = grad_cv if grad_cv is not None else torch.zeros_like(
+                displacement)
+            return g_pos, g_disp
+
+        I_N = torch.eye(num_components).to(energy_cov.device)
+        chunk_size = 1 if num_components < 64 else 16
+        try:
+            grads_cf, grads_cv = (g**2 for g in torch.vmap(
+                get_vjp,
+                in_dims=0,
+                out_dims=(0, 0),
+                chunk_size=chunk_size,
+            )(I_N))
+        except RuntimeError:
+            grads_cf, grads_cv = compute_forces_virials_loop(
+                positions, displacement, training, energy_cov)
+        forces_var = grads_cf.sum(dim=0) + eps
+        virials_var = grads_cv.sum(dim=0)
     else:
         forces_var = virials_var = None
 
@@ -112,6 +133,51 @@ def compute_forces_virials(
         virials_var = virials_var + eps
 
     return forces, virials, stress, forces_var, virials_var, stress_var
+
+
+@torch.jit.unused
+def compute_forces_loop(
+    positions: torch.Tensor,
+    training: bool,
+    energy_cov: torch.Tensor,
+) -> torch.Tensor:
+    grads_cf = []
+    num_components = energy_cov.shape[-1]
+    for k in range(num_components):
+        retain_graph = training or (k < num_components - 1)
+        outputs = [energy_cov[..., k]]
+        grad_outputs = [torch.ones_like(energy_cov[..., k])]
+        grad_cf, _ = get_grad(outputs, [positions], grad_outputs, retain_graph,
+                              training)
+        grads_cf.append(
+            grad_cf if grad_cf is not None else torch.zeros_like(positions))
+    forces_var = (torch.stack(grads_cf, dim=0)**2)
+    return forces_var
+
+
+@torch.jit.unused
+def compute_forces_virials_loop(
+    positions: torch.Tensor,
+    displacement: torch.Tensor,
+    training: bool,
+    energy_cov: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    grads_cf = []
+    grads_cv = []
+    num_components = energy_cov.shape[-1]
+    for k in range(num_components):
+        retain_graph = training or (k < num_components - 1)
+        outputs = [energy_cov[..., k]]
+        grad_outputs = [torch.ones_like(energy_cov[..., k])]
+        grad_cf, grad_cv = get_grad(outputs, [positions, displacement],
+                                    grad_outputs, retain_graph, training)
+        grads_cf.append(
+            grad_cf if grad_cf is not None else torch.zeros_like(positions))
+        grads_cv.append(
+            grad_cv if grad_cv is not None else torch.zeros_like(displacement))
+    forces_var = (torch.stack(grads_cf, dim=0)**2)
+    virials_var = (torch.stack(grads_cv, dim=0)**2)
+    return forces_var, virials_var
 
 
 def get_grad(
@@ -253,7 +319,7 @@ def get_outputs(
         Optional[torch.Tensor],
 ]:
     if (compute_virials or compute_stress) and displacement is not None:
-        forces, virials, stress, forces_var, virials_var, stress_var = compute_forces_virials(
+        forces, virials, stress, forces_var, virials_var, stress_var = compute_forces_virials_vmap(
             energy=energy,
             positions=positions,
             displacement=displacement,
@@ -264,7 +330,7 @@ def get_outputs(
             eps=eps,
         )
     elif compute_force:
-        forces, forces_var = compute_forces(
+        forces, forces_var = compute_forces_vmap(
             energy=energy,
             positions=positions,
             training=(training or compute_hessian or compute_edge_forces),
@@ -281,7 +347,7 @@ def get_outputs(
     else:
         hessian = None
     if compute_edge_forces and vectors is not None:
-        edge_forces, edge_forces_var = compute_forces(
+        edge_forces, edge_forces_var = compute_forces_vmap(
             energy=energy,
             positions=vectors,
             training=(training or compute_hessian),
