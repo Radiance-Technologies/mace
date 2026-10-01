@@ -22,6 +22,9 @@ class LossMode(str, Enum):
     HUBER = "huber"
     UNIVERSAL = "universal"
 
+    def __repr__(self) -> str:
+        return self.name
+
 
 class Loss(torch.nn.Module, ABC):
     """Generic `Loss` module. Defines mode and delta and requires forward."""
