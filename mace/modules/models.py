@@ -106,6 +106,7 @@ class MACE(torch.nn.Module):
         self.use_last_readout_only = use_last_readout_only
         self.use_edge_irreps_first = use_edge_irreps_first
         self.compute_uncertainty = compute_uncertainty
+        self.conservative_uncertainty = conservative_uncertainty
         self.eps = eps
         self.cov_dim = cov_dim
 
@@ -693,27 +694,6 @@ class ScaleShiftMACE(MACE):
 
         total_energy = e0 + inter_e
         node_energy = node_e0.clone().double() + node_inter_es.clone().double()
-
-        node_energy_var: Optional[torch.Tensor] = None
-        energy_cov: Optional[torch.Tensor] = None
-        energy_var: Optional[torch.Tensor] = None
-        if self.compute_uncertainty:
-            node_energy_cov_raw = self.energy_cov_readout(
-                node_feats, node_heads).view(-1, len(self.heads), self.cov_dim)
-
-            node_scale = torch.atleast_1d(self.scale_shift.scale)[node_heads]
-
-            node_energy_cov = node_energy_cov_raw[
-                num_atoms_arange, node_heads] * node_scale.unsqueeze(-1)
-
-            energy_cov = scatter_sum(src=node_energy_cov,
-                                     index=data["batch"],
-                                     dim=0,
-                                     dim_size=num_graphs)
-
-            node_energy_var = torch.sum(node_energy_cov**2, dim=-1) + self.eps
-
-            energy_var = torch.sum(energy_cov**2, dim=-1) + self.eps
 
         node_energy_var: Optional[torch.Tensor] = None
         energy_cov: Optional[torch.Tensor] = None
