@@ -337,6 +337,9 @@ def extract_config_mace_model(model: torch.nn.Module) -> Dict[str, Any]:
         "compute_uncertainty":
         model.compute_uncertainty
         if hasattr(model, "compute_uncertainty") else False,
+        "conservative_uncertainty":
+        model.conservative_uncertainty
+        if hasattr(model, "conservative_uncertainty") else True,
         "eps":
         model.eps if hasattr(model, "eps") else 1e-6,
         "cov_dim":

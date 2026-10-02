@@ -170,7 +170,11 @@ class MACECalculator(Calculator):
         self.arrays_keys = arrays_keys
 
         self.model_type = model_type
-        self.compute_atomic_stresses = False
+        self.compute_virials = kwargs.get("compute_virials", False)
+        self.compute_stress = kwargs.get("compute_stress", False)
+        self.compute_edge_forces = kwargs.get("compute_edge_forces", False)
+        self.compute_atomic_stresses = kwargs.get("compute_atomic_stresses",
+                                                  False)
 
         if model_type not in [
                 "MACE",
@@ -193,17 +197,22 @@ class MACECalculator(Calculator):
                 "node_energy_var",
                 "forces",
                 "forces_var",
-                "stress",
-                "stress_var",
-                "virials",
-                "virials_var",
             ])
-            if kwargs.get("compute_atomic_stresses", False):
+            if self.compute_virials or self.compute_stress:
+                self.implemented_properties.extend([
+                    "virials",
+                    "virials_var",
+                ])
+            if self.compute_stress:
+                self.implemented_properties.extend(["stress", "stress_var"])
+            if self.compute_edge_forces:
+                self.implemented_properties.extend(
+                    ["edge_forces", "edge_forces_var"])
+            if self.compute_atomic_stresses:
                 self.implemented_properties.extend([
                     "atomic_stresses", "atomic_stresses_var", "atomic_virials",
                     "atomic_virials_var"
                 ])
-                self.compute_atomic_stresses = True
         if model_type in [
                 "EnergyDipoleMACE", "DipoleMACE", "DipolePolarizabilityMACE"
         ]:
@@ -639,9 +648,6 @@ class MACECalculator(Calculator):
         num_real_atoms = len(atoms)
         is_padded = self.pad_num_atoms > 0 or self.pad_num_edges > 0
 
-        compute_stress = self.model_type in [
-            "MACE", "EnergyDipoleMACE", "PolarMACE"
-        ]
         # For oeq/hybrid + compile: create displacement outside the compiled
         # graph so autograd.grad (which runs as a graph break) can
         # differentiate energy w.r.t. displacement for stress.
@@ -658,7 +664,7 @@ class MACECalculator(Calculator):
                     batch[key] = value.to(dtype=model_dtype)
             batch_dict = batch.to_dict()
 
-            if oeq_compile and compute_stress:
+            if oeq_compile and self.compute_stress or self.compute_virials:
                 positions = batch_dict["positions"]
                 num_graphs = int(batch_dict["ptr"].numel() - 1)
                 displacement = torch.zeros(
@@ -671,9 +677,10 @@ class MACECalculator(Calculator):
 
             out = model(
                 batch_dict,
-                compute_stress=compute_stress,
+                compute_virials=self.compute_virials,
+                compute_stress=self.compute_stress,
                 training=self.use_compile and not oeq_compile,
-                compute_edge_forces=self.compute_atomic_stresses,
+                compute_edge_forces=self.compute_edge_forces,
                 compute_atomic_stresses=self.compute_atomic_stresses,
             )
             if is_padded:
@@ -693,25 +700,29 @@ class MACECalculator(Calculator):
         ])
         results_map = [
             ("energy", self.energy_units_to_eV),
-            ("energy_var", self.energy_units_to_eV),
+            ("energy_var", self.energy_units_to_eV**2),
             ("node_energy", self.energy_units_to_eV),
-            ("node_energy_var", self.energy_units_to_eV),
+            ("node_energy_var", self.energy_units_to_eV**2),
             ("forces", self.energy_units_to_eV / self.length_units_to_A),
-            ("forces_var", self.energy_units_to_eV / self.length_units_to_A),
+            ("forces_var",
+             self.energy_units_to_eV**2 / self.length_units_to_A**2),
+            ("edge_forces", self.energy_units_to_eV / self.length_units_to_A),
+            ("edge_forces_var",
+             self.energy_units_to_eV**2 / self.length_units_to_A**2),
             ("stress", self.energy_units_to_eV / self.length_units_to_A**3),
             ("stress_var",
-             self.energy_units_to_eV / self.length_units_to_A**3),
+             self.energy_units_to_eV**2 / self.length_units_to_A**6),
             ("virials", self.energy_units_to_eV / self.length_units_to_A**3),
             ("virials_var",
-             self.energy_units_to_eV / self.length_units_to_A**3),
+             self.energy_units_to_eV**2 / self.length_units_to_A**6),
             ("atomic_stresses",
              self.energy_units_to_eV / self.length_units_to_A**3),
             ("atomic_stresses_var",
-             self.energy_units_to_eV / self.length_units_to_A**3),
+             self.energy_units_to_eV**2 / self.length_units_to_A**6),
             ("atomic_virials",
              self.energy_units_to_eV / self.length_units_to_A**3),
             ("atomic_virials_var",
-             self.energy_units_to_eV / self.length_units_to_A**3),
+             self.energy_units_to_eV**2 / self.length_units_to_A**6),
             ("dipole", 1.0),
             ("dipole_var", 1.0),
             ("atomic_dipoles", 1.0),

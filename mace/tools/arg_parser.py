@@ -84,15 +84,26 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
     )
-    parser.add_argument("--compute_uncertainty",
-                        help="Use Negative Log Likelihood Loss instead of MSE",
+    parser.add_argument(
+        "--compute_uncertainty",
+        help="Use Negative Log Likelihood Loss instead of MSE.",
+        type=str2bool,
+        default=False)
+    parser.add_argument("--conservative_uncertainty",
+                        help="Ensure variances calculated using gradients.",
                         type=str2bool,
-                        default=False)
+                        default=True)
     parser.add_argument(
         "--uncertainty_eps",
         help="Cutoff for clamping variance",
         type=float,
         default=1e-6,
+    )
+    parser.add_argument(
+        "--cov_dim",
+        help="Dimension of covariance matrix for uncertainty.",
+        type=int,
+        default=16,
     )
     parser.add_argument(
         "--launcher",
